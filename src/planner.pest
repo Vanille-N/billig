@@ -66,3 +66,6 @@ template_descriptor = {
     "@Template<" ~ identifier ~ ">" ~ template_args?
     ~ whitespace ~ template_expansion_contents
 }
+
+item = { template_descriptor | entries_year } 
+program = _{ SOI ~ ( whitespace ~ item ~ whitespace )* ~ EOI }
