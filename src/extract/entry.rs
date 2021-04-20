@@ -2,10 +2,10 @@ use crate::extract::{Tag, Amount};
 
 #[derive(Debug)]
 pub struct Entry {
-    value: Amount,
-    cat: Category,
-    span: Span,
-    tag: Tag,
+    pub value: Amount,
+    pub cat: Category,
+    pub span: Span,
+    pub tag: Tag,
 }
 
 #[derive(Debug)]
@@ -21,9 +21,9 @@ pub enum Category {
 
 #[derive(Debug)]
 pub struct Span {
-    duration: Duration,
-    window: Window,
-    count: usize,
+    pub duration: Duration,
+    pub window: Window,
+    pub count: usize,
 }
 
 #[derive(Debug)]

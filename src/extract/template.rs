@@ -15,7 +15,7 @@ pub struct Template {
 }
 
 #[derive(Debug)]
-pub struct TagTemplate(Vec<TagTemplateItem>);
+pub struct TagTemplate(pub Vec<TagTemplateItem>);
 
 #[derive(Debug)]
 pub enum TagTemplateItem {
