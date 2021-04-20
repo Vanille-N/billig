@@ -1,0 +1,4 @@
+/target
+
+# *.pln files may contain sensitive information
+*.pln
