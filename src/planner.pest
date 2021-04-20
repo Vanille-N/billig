@@ -39,3 +39,30 @@ entries_month = { marker_month ~ colon ~ entries_day+ }
 entries_year = { marker_year ~ colon ~ entries_month+ }
 
 comment = _{ "//" ~ ( !"\n" ~  ANY )* }
+
+template_time = { "@Day" | "@Month" | "@Year" }
+template_arg_expand = { "@Arg(" ~ identifier ~ ")" }
+template_value = { money_amount | template_arg_expand }
+template_string = { tag_text | template_arg_expand | template_time }
+template_value_args = { "(" ~ template_value ~ ( whitespace ~ template_value )* ~ ")" }
+template_string_args = { "(" ~ template_string ~ ( whitespace ~ template_string )* ~ ")" }
+builtin_add = { "@Add" ~ template_value_args }
+builtin_neg = { "@Neg" ~ ( builtin_add | template_arg_expand ) }
+template_money_amount = { builtin_neg | builtin_add | template_arg_expand | money_amount }
+builtin_concat = { "@Concat" ~ template_string_args }
+template_val = { "val" ~ whitespace ~ template_money_amount } 
+template_type = { entry_type }
+template_span = { entry_span }
+template_tag = { "tag" ~ whitespace ~ ( tag_text | builtin_concat ) }
+template_entry = _{ template_val | template_type | template_tag | template_span }
+template_expansion_contents = {
+    "{" ~ whitespace ~ template_entry
+    ~ ( comma ~ template_entry )* ~ comma?
+    ~ "}"
+}
+template_arg = { identifier ~ ( "=" ~ ( money_amount | tag_text ) )? }
+template_args = { "(" ~ template_arg ~ ( comma ~ template_arg )* ~ ")" }
+template_descriptor = {
+    "@Template<" ~ identifier ~ ">" ~ template_args?
+    ~ whitespace ~ template_expansion_contents
+}
