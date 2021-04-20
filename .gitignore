@@ -1,4 +1,4 @@
 /target
 
-# *.pln files may contain sensitive information
-*.pln
+# *.bil files may contain sensitive information
+*.bil

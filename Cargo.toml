@@ -1,5 +1,5 @@
 [package]
-name = "planner"
+name = "bilancio"
 version = "0.1.0"
 authors = ["Vanille-N <neven.villani@gmail.com>"]
 edition = "2018"

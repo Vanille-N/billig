@@ -1,3 +1,5 @@
+mod extract;
+
 fn main() {
-    planner::parse::main();
+    extract::parse::extract("data.bil");
 }
