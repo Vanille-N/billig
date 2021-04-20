@@ -1,23 +1,23 @@
 digit = _{ '0'..'9' }
-number = { digit+ }
-whitespace = _{ ( " " | "\n" | "\t" )* }
-comma = _{ "," ~ whitespace }
-semicolon = _{ ";" ~ whitespace }
-colon = _{ ":" ~ whitespace }
+number = @{ digit+ }
+whitespace = _{ ( " " | "\n" | "\t" )+ }
+comma = _{ whitespace? ~ "," ~ whitespace? }
+semicolon = _{ whitespace? ~ ";" ~ whitespace? }
+colon = _{ whitespace? ~ ":" ~ whitespace? }
 
 marker_year = { digit{4} }
 marker_month = { "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" }
-marker_day = { digit{2} }
+marker_day = @{ digit{2} }
 
-money_amount = { "-"? ~ digit+ ~ ( "." ~ digit{1,2} )? }
+money_amount = @{ "-"? ~ digit+ ~ ( "." ~ digit{1,2} )? }
 tag_text = { "'" ~ (!"'" ~ ANY)* ~ "'" }
 
-identifier = { ( 'a'..'z' | 'A'..'Z' | "_" )+ }
+identifier = @{ ( 'a'..'z' | 'A'..'Z' | "_" )+ }
 
 expense_type = { "Pay" | "Food" | "Com" | "Mov" | "Scol" | "Clean" | "Home" }
 span_duration = { "Day" | "Week" | "Month" | "Year" }
 span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
-span_value = { span_duration ~ ( "<" ~ span_window ~ ">" )? ~ ( "(" ~ number ~ ")" )? }
+span_value = { span_duration ~ ( "<" ~ span_window ~ ">" )? ~ ( whitespace? ~ number )? }
 
 entry_val = { "val" ~ whitespace ~ money_amount }
 entry_type = { "type" ~ whitespace ~ expense_type }
@@ -26,11 +26,11 @@ entry_tag = { "tag" ~ whitespace ~ tag_text }
 entry_item = _{ entry_val | entry_type | entry_tag | entry_span }
 
 positional_arg = { money_amount | tag_text }
-named_arg = { identifier ~ whitespace ~ "=" ~ whitespace ~ positional_arg }
+named_arg = { identifier ~ "=" ~ positional_arg }
 argument = { positional_arg | named_arg }
-arguments = { "(" ~ argument ~ ( comma ~ argument )* ~ comma? ~ ")" }
+arguments = { ( whitespace ~ argument )* }
 
-expand_entry = { "{" ~ identifier ~ "}" ~ arguments? }
+expand_entry = { "!" ~ identifier ~ arguments? }
 plain_entry = { entry_item ~ ( comma ~ entry_item )* ~ comma? }
 entry = { ( expand_entry | plain_entry ) ~ semicolon }
 
@@ -38,17 +38,17 @@ entries_day = { marker_day ~ colon ~ entry+ }
 entries_month = { marker_month ~ colon ~ entries_day+ }
 entries_year = { marker_year ~ colon ~ entries_month+ }
 
-comment = _{ "//" ~ ( !"\n" ~  ANY )* }
+comment = _{ "//" ~ ( !"\n" ~ ANY )* }
 
 template_time = { "@Day" | "@Month" | "@Year" }
-template_arg_expand = { "@Arg(" ~ identifier ~ ")" }
+template_arg_expand = { "&" ~ identifier }
 template_value = { money_amount | template_arg_expand }
 template_string = { tag_text | template_arg_expand | template_time }
-template_value_args = { "(" ~ template_value ~ ( whitespace ~ template_value )* ~ ")" }
-template_string_args = { "(" ~ template_string ~ ( whitespace ~ template_string )* ~ ")" }
-builtin_add = { "@Add" ~ template_value_args }
-builtin_neg = { "@Neg" ~ ( builtin_add | template_arg_expand ) }
-template_money_amount = { builtin_neg | builtin_add | template_arg_expand | money_amount }
+template_value_args = { ( whitespace ~ template_value )* }
+template_string_args = { ( whitespace ~ template_string )* }
+builtin_sum = { "@Sum" ~ template_value_args }
+builtin_neg = { "@Neg" ~ whitespace? ~ ( builtin_sum | template_arg_expand ) }
+template_money_amount = { builtin_neg | builtin_sum | template_arg_expand | money_amount }
 builtin_concat = { "@Concat" ~ template_string_args }
 template_val = { "val" ~ whitespace ~ template_money_amount } 
 template_type = { entry_type }
@@ -56,16 +56,16 @@ template_span = { entry_span }
 template_tag = { "tag" ~ whitespace ~ ( tag_text | builtin_concat ) }
 template_entry = _{ template_val | template_type | template_tag | template_span }
 template_expansion_contents = {
-    "{" ~ whitespace ~ template_entry
+    "{" ~ whitespace? ~ template_entry
     ~ ( comma ~ template_entry )* ~ comma?
-    ~ "}"
+    ~ whitespace? ~ "}"
 }
 template_arg = { identifier ~ ( "=" ~ ( money_amount | tag_text ) )? }
-template_args = { "(" ~ template_arg ~ ( comma ~ template_arg )* ~ ")" }
+template_args = { ( whitespace ~ template_arg )* }
 template_descriptor = {
-    "@Template<" ~ identifier ~ ">" ~ template_args?
-    ~ whitespace ~ template_expansion_contents
+    "!" ~ identifier ~ template_args?
+    ~ whitespace? ~ template_expansion_contents
 }
 
-item = { template_descriptor | entries_year } 
-program = _{ SOI ~ ( whitespace ~ item ~ whitespace )* ~ EOI }
+item = { template_descriptor | entries_year | comment } 
+program = _{ SOI ~ ( whitespace? ~ item ~ whitespace? )* ~ ("EOF" | EOI) }
