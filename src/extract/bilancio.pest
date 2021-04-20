@@ -38,7 +38,7 @@ entries_day = { marker_day ~ colon ~ entry+ }
 entries_month = { marker_month ~ colon ~ entries_day+ }
 entries_year = { marker_year ~ colon ~ entries_month+ }
 
-comment = _{ "//" ~ ( !"\n" ~ ANY )* }
+comment = { "//" ~ ( !"\n" ~ ANY )* }
 
 template_time = { "@Day" | "@Month" | "@Year" }
 template_arg_expand = { "&" ~ identifier }

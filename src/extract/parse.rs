@@ -2,12 +2,14 @@ use pest::Parser;
 use pest_derive::*;
 
 #[derive(Parser)]
-#[grammar = "extract/planner.pest"]
+#[grammar = "extract/bilancio.pest"]
 pub struct BilancioParser;
 
 use std::fs;
 
-pub fn extract(filename: &str) -> Option<Ast> {
+use crate::extract::validate;
+
+pub fn extract(filename: &str) -> Option<validate::Ast> {
     println!("In file {}", filename);
 
     let contents = match fs::read_to_string(filename) {
@@ -26,11 +28,5 @@ pub fn extract(filename: &str) -> Option<Ast> {
             return None;
         }
     };
-    println!("{:#?}", contents);
-    None
-}
-
-pub enum Ast {
-    Entries(Vec<Entry>),
-    Templates(Vec<Template>),
+    validate::validate(contents)
 }
