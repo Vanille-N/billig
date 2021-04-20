@@ -13,3 +13,29 @@ money_amount = { "-"? ~ digit+ ~ ( "." ~ digit{1,2} )? }
 tag_text = { "'" ~ (!"'" ~ ANY)* ~ "'" }
 
 identifier = { ( 'a'..'z' | 'A'..'Z' | "_" )+ }
+
+expense_type = { "Pay" | "Food" | "Com" | "Mov" | "Scol" | "Clean" | "Home" }
+span_duration = { "Day" | "Week" | "Month" | "Year" }
+span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
+span_value = { span_duration ~ ( "<" ~ span_window ~ ">" )? ~ ( "(" ~ number ~ ")" )? }
+
+entry_val = { "val" ~ whitespace ~ money_amount }
+entry_type = { "type" ~ whitespace ~ expense_type }
+entry_span = { "span" ~ whitespace ~ span_value }
+entry_tag = { "tag" ~ whitespace ~ tag_text }
+entry_item = _{ entry_val | entry_type | entry_tag | entry_span }
+
+positional_arg = { money_amount | tag_text }
+named_arg = { identifier ~ whitespace ~ "=" ~ whitespace ~ positional_arg }
+argument = { positional_arg | named_arg }
+arguments = { "(" ~ argument ~ ( comma ~ argument )* ~ comma? ~ ")" }
+
+expand_entry = { "{" ~ identifier ~ "}" ~ arguments? }
+plain_entry = { entry_item ~ ( comma ~ entry_item )* ~ comma? }
+entry = { ( expand_entry | plain_entry ) ~ semicolon }
+
+entries_day = { marker_day ~ colon ~ entry+ }
+entries_month = { marker_month ~ colon ~ entries_day+ }
+entries_year = { marker_year ~ colon ~ entries_month+ }
+
+comment = _{ "//" ~ ( !"\n" ~  ANY )* }
