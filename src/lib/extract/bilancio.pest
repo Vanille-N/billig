@@ -59,7 +59,7 @@ template_expansion_contents = {
     ~ whitespace? ~ "}"
 }
 template_positional_arg = { identifier ~ !"=" }
-template_named_arg = { identifier ~ "=" ~ ( money_amount | template_string ) }
+template_named_arg = { identifier ~ "=" ~ ( money_amount | tag_text ) }
 template_args = {
     ( whitespace ~ template_positional_arg )*
     ~ ( whitespace ~ template_named_arg )*

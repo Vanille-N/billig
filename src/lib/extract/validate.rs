@@ -1,6 +1,6 @@
 pub type Ast = Vec<AstItem>;
 
-use crate::extract::{
+use crate::lib::extract::{
     entry::{Category, Duration, Entry, Span, Window},
     instance::{Arg, Instance},
     parse::Rule,
@@ -8,10 +8,15 @@ use crate::extract::{
     Amount, Tag,
 };
 
+use crate::lib::date::{
+    Date,
+    Month,
+};
+
 #[derive(Debug)]
 pub enum AstItem {
-    Entry(Entry),
-    Instance(Instance),
+    Entry(Date, Entry),
+    Instance(Date, Instance),
     Template(String, Template),
 }
 
@@ -45,7 +50,22 @@ pub fn validate(pairs: Pairs<'_, Rule>) -> Option<Ast> {
                                 ast.push(AstItem::Template(name, templ));
                             }
                         },
-                        _ => panic!("{:#?}", item.as_rule()),
+                        Rule::entries_year => {
+                            let mut items = item.into_inner().into_iter();
+                            let item = items.next().unwrap();
+                            assert_eq!(item.as_rule(), Rule::marker_year);
+                            let year = item.as_str().parse::<usize>()
+                                .unwrap();
+                            match validate_year(year, items.collect::<Vec<_>>()) {
+                                None => return None,
+                                Some(items) => {
+                                    for item in items {
+                                        ast.push(item);
+                                    }
+                                }
+                            }
+                        }
+                        _ => unreachable!(),
                     }
                 }
             }
@@ -208,7 +228,9 @@ fn validate_arg(pair: Pair<'_, Rule>) -> Option<(String, Option<Arg>)> {
                         .unwrap()
                         .as_str()
                         .to_string())),
-                    _ => unreachable!(),
+                    _ => {
+                        unreachable!()
+                    },
                 }
             };
             Some((name, Some(default)))
@@ -372,4 +394,71 @@ fn validate_template_tag(pair: Pair<'_, Rule>) -> Option<TagTemplate> {
         });
     }
     Some(TagTemplate(strs))
+}
+
+fn validate_year(year: usize, pairs: Vec<Pair<'_, Rule>>) -> Option<Vec<AstItem>> {
+    let mut v = Vec::new();
+    for pair in pairs {
+        assert_eq!(pair.as_rule(), Rule::entries_month);
+        let mut items = pair.into_inner().into_iter();
+        let fst = items.next().unwrap();
+        let month = Month::from(fst.as_str());
+        let items = validate_month(year, month, items.collect::<Vec<_>>())?;
+        for item in items {
+            v.push(item);
+        } 
+    }
+    Some(v)
+}
+
+fn validate_month(year: usize, month: Month, pairs: Vec<Pair<'_, Rule>>) -> Option<Vec<AstItem>> {
+    let mut v = Vec::new();
+    for pair in pairs {
+        assert_eq!(pair.as_rule(), Rule::entries_day);
+        let mut items = pair.into_inner().into_iter();
+        let fst = items.next().unwrap();
+        let day = fst.as_str().parse::<usize>().unwrap();
+        match Date::from(year, month, day) {
+            Ok(date) => {
+                let items = validate_day(date, items.collect::<Vec<_>>())?;
+                for item in items {
+                    v.push(item);
+                }
+            }
+            Err(err) => {
+                println!("{}", err);
+                return None;
+            }
+        }
+    }
+    Some(v)
+}
+
+fn validate_day(date: Date, pairs: Vec<Pair<'_, Rule>>) -> Option<Vec<AstItem>> {
+    println!("{:?}", date);
+    let mut v = Vec::new();
+    for pair in pairs {
+        assert_eq!(pair.as_rule(), Rule::entry);
+        let entry = pair.into_inner().into_iter().next().unwrap();
+        match entry.as_rule() {
+            Rule::expand_entry => {
+                let res = validate_expand_entry(entry.into_inner())?;
+                v.push(AstItem::Instance(date.clone(), res));
+            }
+            Rule::plain_entry => {
+                let res = validate_plain_entry(entry.into_inner())?;
+                v.push(AstItem::Entry(date.clone(), res));
+            }
+            _ => unreachable!(),
+        }
+    }
+    Some(v)
+}
+
+fn validate_expand_entry(pairs: Pairs<'_, Rule>) -> Option<Instance> {
+    unimplemented!()
+}
+
+fn validate_plain_entry(pairs: Pairs<'_, Rule>) -> Option<Entry> {
+    unimplemented!()
 }
