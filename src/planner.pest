@@ -1,0 +1,15 @@
+digit = _{ '0'..'9' }
+number = { digit+ }
+whitespace = _{ ( " " | "\n" | "\t" )* }
+comma = _{ "," ~ whitespace }
+semicolon = _{ ";" ~ whitespace }
+colon = _{ ":" ~ whitespace }
+
+marker_year = { digit{4} }
+marker_month = { "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" }
+marker_day = { digit{2} }
+
+money_amount = { "-"? ~ digit+ ~ ( "." ~ digit{1,2} )? }
+tag_text = { "'" ~ (!"'" ~ ANY)* ~ "'" }
+
+identifier = { ( 'a'..'z' | 'A'..'Z' | "_" )+ }
