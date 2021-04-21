@@ -1,4 +1,3 @@
-pub type Ast = Vec<AstItem>;
 
 use crate::lib::extract::{
     entry::{Category, Duration, Entry, Span, Window},
@@ -11,11 +10,12 @@ use crate::lib::extract::{
 use crate::lib::date::{Date, Month};
 
 #[derive(Debug)]
-pub enum AstItem {
+pub enum AstItem<'i> {
     Entry(Date, Entry),
-    Instance(Date, Instance),
-    Template(String, Template),
+    Instance(Date, pest::Span<'i>, Instance),
+    Template(String, pest::Span<'i>, Template),
 }
+pub type Ast<'i> = Vec<AstItem<'i>>;
 
 use pest::{
     error::{Error, ErrorVariant},
@@ -23,6 +23,7 @@ use pest::{
 };
 pub type Result<T> = std::result::Result<T, Error<Rule>>;
 
+// build and return pest::Error from message and span
 macro_rules! failure {
     ( $msg:expr, $span:expr ) => {{
         let err: Error<Rule> = Error::new_from_span(
@@ -35,6 +36,7 @@ macro_rules! failure {
     }};
 }
 
+// extract contents of wrapper rule
 macro_rules! subrule {
     ( $node:expr, $rule:expr ) => {{
         let node = $node;
@@ -58,6 +60,7 @@ macro_rules! subrule {
     }};
 }
 
+// get first and rest of inner
 macro_rules! decapitate {
     ( $node:expr ) => {{
         let mut items = $node.into_inner().into_iter();
@@ -66,6 +69,7 @@ macro_rules! decapitate {
     }};
 }
 
+// extract two-element inner
 macro_rules! pair {
     ( $node:expr ) => {{
         let mut items = $node.into_inner().into_iter();
@@ -76,6 +80,7 @@ macro_rules! pair {
     }};
 }
 
+// extract three-element inner
 macro_rules! triplet {
     ( $node:expr ) => {{
         let mut items = $node.into_inner().into_iter();
@@ -87,24 +92,28 @@ macro_rules! triplet {
     }};
 }
 
+// pair to usize contents
 macro_rules! parse_usize {
     ( $node:expr ) => {
         $node.as_str().parse::<usize>().unwrap()
     };
 }
 
+// pair to amount contents
 macro_rules! parse_amount {
     ( $node:expr ) => {
         ($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize
     };
 }
 
+// convert to string
 macro_rules! as_string {
     ( $node:expr ) => {
         $node.as_str().to_string()
     };
 }
 
+// set-once value
 macro_rules! set_or_fail {
     ( $var:expr, $val:expr, $name:expr, $loc:expr ) => {{
         if $var.is_some() {
@@ -114,13 +123,14 @@ macro_rules! set_or_fail {
     }};
 }
 
+// non-optional value
 macro_rules! unwrap_or_fail {
     ( $val:expr, $name:expr, $loc:expr ) => {{
         match $val {
             Some(v) => v,
             None => failure!(format!("Unspecified {}", $name), $loc),
         }
-    }}
+    }};
 }
 
 pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
@@ -129,11 +139,12 @@ pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
         match pair.as_rule() {
             Rule::item => {
                 for item in pair.into_inner() {
+                    let loc = item.as_span().clone();
                     match item.as_rule() {
                         Rule::comment => (),
                         Rule::template_descriptor => {
                             let (name, templ) = validate_template(item)?;
-                            ast.push(AstItem::Template(name, templ));
+                            ast.push(AstItem::Template(name, loc, templ));
                         }
                         Rule::entries_year => {
                             let (head, body) = decapitate!(item);
@@ -400,10 +411,11 @@ fn validate_day(date: Date, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> 
     let mut v = Vec::new();
     for pair in pairs {
         let entry = subrule!(pair, Rule::entry);
+        let loc = entry.as_span().clone();
         match entry.as_rule() {
             Rule::expand_entry => {
                 let res = validate_expand_entry(entry)?;
-                v.push(AstItem::Instance(date.clone(), res));
+                v.push(AstItem::Instance(date.clone(), loc, res));
             }
             Rule::plain_entry => {
                 let res = validate_plain_entry(entry)?;
