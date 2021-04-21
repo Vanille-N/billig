@@ -114,6 +114,15 @@ macro_rules! set_or_fail {
     }};
 }
 
+macro_rules! unwrap_or_fail {
+    ( $val:expr, $name:expr, $loc:expr ) => {{
+        match $val {
+            Some(v) => v,
+            None => failure!(format!("Unspecified {}", $name), $loc),
+        }
+    }}
+}
+
 pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
     let mut ast = Vec::new();
     for pair in pairs {
@@ -180,22 +189,10 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(String, Template)> {
             _ => unreachable!(),
         }
     }
-    let value = match value {
-        Some(v) => v,
-        None => failure!("val is unspecified", loc),
-    };
-    let cat = match cat {
-        Some(c) => c,
-        None => failure!("cat is unspecified", loc),
-    };
-    let span = match span {
-        Some(s) => s,
-        None => failure!("span is unspecified", loc),
-    };
-    let tag = match tag {
-        Some(t) => t,
-        None => failure!("tag is unspecified", loc),
-    };
+    let value = unwrap_or_fail!(value, "val", loc);
+    let cat = unwrap_or_fail!(cat, "cat", loc);
+    let span = unwrap_or_fail!(span, "span", loc);
+    let tag = unwrap_or_fail!(tag, "tag", loc);
     Ok((
         identifier,
         Template {
@@ -478,22 +475,10 @@ fn validate_plain_entry(pair: Pair<'_, Rule>) -> Result<Entry> {
             _ => unreachable!(),
         }
     }
-    let value = match value {
-        Some(v) => v,
-        None => failure!("Unspecified val", loc),
-    };
-    let cat = match cat {
-        Some(c) => c,
-        None => failure!("Unspecified val", loc),
-    };
-    let span = match span {
-        Some(s) => s,
-        None => failure!("Unspecified span", loc),
-    };
-    let tag = match tag {
-        Some(t) => t,
-        None => failure!("Unspecified tag", loc),
-    };
+    let value = unwrap_or_fail!(value, "val", loc);
+    let cat = unwrap_or_fail!(cat, "cat", loc);
+    let span = unwrap_or_fail!(span, "span", loc);
+    let tag = unwrap_or_fail!(tag, "tag", loc);
     Ok(Entry {
         value,
         cat,
