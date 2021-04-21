@@ -1,14 +1,14 @@
 #[derive(Debug)]
-pub struct Instance {
-    pub label: String,
-    pub pos: Vec<Arg>,
-    pub named: Vec<(String, Arg)>,
+pub struct Instance<'i> {
+    pub label: &'i str,
+    pub pos: Vec<Arg<'i>>,
+    pub named: Vec<(&'i str, Arg<'i>)>,
 }
 
-use crate::extract::{Amount, Tag};
+use crate::extract::Amount;
 
 #[derive(Debug)]
-pub enum Arg {
+pub enum Arg<'i> {
     Amount(Amount),
-    Tag(Tag),
+    Tag(&'i str),
 }

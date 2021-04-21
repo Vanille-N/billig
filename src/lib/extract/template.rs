@@ -1,38 +1,38 @@
 use crate::extract::{
     entry::{Category, Span},
     instance::Arg,
-    Amount, Tag,
+    Amount, 
 };
 
 #[derive(Debug)]
-pub struct Template {
-    pub arguments: Vec<(String, Option<Arg>)>,
-    pub value: AmountTemplate,
+pub struct Template<'i> {
+    pub arguments: Vec<(&'i str, Option<Arg<'i>>)>,
+    pub value: AmountTemplate<'i>,
     pub cat: Category,
     pub span: Span,
-    pub tag: TagTemplate,
+    pub tag: TagTemplate<'i>,
 }
 
 #[derive(Debug)]
-pub struct TagTemplate(pub Vec<TagTemplateItem>);
+pub struct TagTemplate<'i>(pub Vec<TagTemplateItem<'i>>);
 
 #[derive(Debug)]
-pub enum TagTemplateItem {
+pub enum TagTemplateItem<'i> {
     Day,
     Month,
     Year,
-    Raw(Tag),
-    Arg(String),
+    Raw(&'i str),
+    Arg(&'i str),
 }
 
 #[derive(Debug)]
-pub struct AmountTemplate {
+pub struct AmountTemplate<'i> {
     pub sign: bool,
-    pub sum: Vec<AmountTemplateItem>,
+    pub sum: Vec<AmountTemplateItem<'i>>,
 }
 
 #[derive(Debug)]
-pub enum AmountTemplateItem {
+pub enum AmountTemplateItem<'i> {
     Cst(Amount),
-    Arg(String),
+    Arg(&'i str),
 }

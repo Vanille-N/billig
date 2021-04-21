@@ -1,8 +1,8 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Date {
-    year: usize,
+    year: u16,
     month: Month,
-    day: usize,
+    day: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,23 +60,39 @@ impl Date {
             return Err(DateError::InvalidDay(year, month, day));
         } else if day == 31 {
             match month {
-                Jan | Mar | May | Jul | Aug | Oct | Dec => Ok(Self { year, month, day }),
+                Jan | Mar | May | Jul | Aug | Oct | Dec => Ok(Self {
+                    year: year as u16,
+                    month,
+                    day: day as u8,
+                }),
                 _ => Err(DateError::MonthTooShort(year, month, day)),
             }
         } else if day == 30 {
             if month == Feb {
                 Err(DateError::MonthTooShort(year, month, day))
             } else {
-                Ok(Self { year, month, day })
+                Ok(Self {
+                    year: year as u16,
+                    month,
+                    day: day as u8,
+                })
             }
         } else if day == 29 {
             if month == Feb && !is_bissextile(year) {
                 Err(DateError::NotBissextile(year))
             } else {
-                Ok(Self { year, month, day })
+                Ok(Self {
+                    year: year as u16,
+                    month,
+                    day: day as u8,
+                })
             }
         } else {
-            Ok(Self { year, month, day })
+            Ok(Self {
+                year: year as u16,
+                month,
+                day: day as u8,
+            })
         }
     }
 }

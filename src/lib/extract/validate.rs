@@ -1,4 +1,3 @@
-
 use crate::lib::extract::{
     entry::{Category, Duration, Entry, Span, Window},
     instance::{Arg, Instance},
@@ -12,8 +11,8 @@ use crate::lib::date::{Date, Month};
 #[derive(Debug)]
 pub enum AstItem<'i> {
     Entry(Date, Entry),
-    Instance(Date, pest::Span<'i>, Instance),
-    Template(String, pest::Span<'i>, Template),
+    Instance(Date, pest::Span<'i>, Instance<'i>),
+    Template(&'i str, pest::Span<'i>, Template<'i>),
 }
 pub type Ast<'i> = Vec<AstItem<'i>>;
 
@@ -106,13 +105,6 @@ macro_rules! parse_amount {
     };
 }
 
-// convert to string
-macro_rules! as_string {
-    ( $node:expr ) => {
-        $node.as_str().to_string()
-    };
-}
-
 // set-once value
 macro_rules! set_or_fail {
     ( $var:expr, $val:expr, $name:expr, $loc:expr ) => {{
@@ -166,11 +158,11 @@ pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
     Ok(ast)
 }
 
-fn validate_template(pair: Pair<'_, Rule>) -> Result<(String, Template)> {
+fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
     let loc = pair.as_span().clone();
     let (id, args, body) = triplet!(pair);
     assert_eq!(id.as_rule(), Rule::identifier);
-    let identifier = as_string!(id);
+    let identifier = id.as_str();
     assert_eq!(args.as_rule(), Rule::template_args);
     let arguments = validate_args(args.into_inner())?;
     assert_eq!(body.as_rule(), Rule::template_expansion_contents);
@@ -216,7 +208,7 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(String, Template)> {
     ))
 }
 
-fn validate_args(pairs: Pairs<'_, Rule>) -> Result<Vec<(String, Option<Arg>)>> {
+fn validate_args(pairs: Pairs<'_, Rule>) -> Result<Vec<(&str, Option<Arg>)>> {
     let mut args = Vec::new();
     for pair in pairs {
         args.push(validate_arg(pair)?);
@@ -224,21 +216,20 @@ fn validate_args(pairs: Pairs<'_, Rule>) -> Result<Vec<(String, Option<Arg>)>> {
     Ok(args)
 }
 
-fn validate_arg(pair: Pair<'_, Rule>) -> Result<(String, Option<Arg>)> {
+fn validate_arg(pair: Pair<'_, Rule>) -> Result<(&str, Option<Arg>)> {
     match pair.as_rule() {
         Rule::template_positional_arg => {
-            let name = as_string!(pair);
+            let name = pair.as_str();
             Ok((name, None))
         }
         Rule::template_named_arg => {
             let (name, default) = pair!(pair);
-            let name = as_string!(name);
+            let name = name.as_str();
             let default = {
                 match default.as_rule() {
                     Rule::money_amount => Arg::Amount(validate_amount(default)?),
                     Rule::tag_text => {
-                        let tag = subrule!(default, Rule::tag_text);
-                        Arg::Tag(Tag(as_string!(tag)))
+                        Arg::Tag(subrule!(default, Rule::tag_text).as_str())
                     }
                     _ => {
                         unreachable!()
@@ -276,7 +267,7 @@ fn validate_template_amount(pair: Pair<'_, Rule>) -> Result<AmountTemplate> {
                 sum.push(AmountTemplateItem::Cst(validate_amount(item)?));
             }
             Rule::template_arg_expand => {
-                sum.push(AmountTemplateItem::Arg(as_string!(subrule!(item))))
+                sum.push(AmountTemplateItem::Arg(subrule!(item).as_str()))
             }
             _ => unreachable!(),
         }
@@ -351,8 +342,8 @@ fn validate_template_tag(pair: Pair<'_, Rule>) -> Result<TagTemplate> {
     use TagTemplateItem::*;
     for item in concat {
         strs.push(match item.as_rule() {
-            Rule::tag_text => Raw(Tag(as_string!(subrule!(item)))),
-            Rule::template_arg_expand => Arg(as_string!(subrule!(item))),
+            Rule::tag_text => Raw(subrule!(item).as_str()),
+            Rule::template_arg_expand => Arg(subrule!(item).as_str()),
             Rule::template_time => match item.as_str() {
                 "@Day" => Day,
                 "@Month" => Month,
@@ -429,7 +420,7 @@ fn validate_day(date: Date, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> 
 
 fn validate_expand_entry(pairs: Pair<'_, Rule>) -> Result<Instance> {
     let (label, args) = pair!(pairs);
-    let label = as_string!(label);
+    let label = label.as_str();
     let mut pos = Vec::new();
     let mut named = Vec::new();
     for arg in args.into_inner() {
@@ -439,7 +430,7 @@ fn validate_expand_entry(pairs: Pair<'_, Rule>) -> Result<Instance> {
             }
             Rule::named_arg => {
                 let (name, value) = pair!(arg);
-                let name = as_string!(name);
+                let name = name.as_str();
                 let value = validate_value(subrule!(value)).unwrap();
                 named.push((name, value));
             }
@@ -449,10 +440,10 @@ fn validate_expand_entry(pairs: Pair<'_, Rule>) -> Result<Instance> {
     Ok(Instance { label, pos, named })
 }
 
-fn validate_value(pair: Pair<'_, Rule>) -> Result<Arg> {
+fn validate_value(pair: Pair<'_, Rule>) -> Result<Arg<'_>> {
     Ok(match pair.as_rule() {
         Rule::money_amount => Arg::Amount(validate_amount(pair)?),
-        Rule::tag_text => Arg::Tag(Tag(subrule!(pair).as_str().to_string())),
+        Rule::tag_text => Arg::Tag(subrule!(pair).as_str()),
         _ => {
             unreachable!()
         }
@@ -479,7 +470,7 @@ fn validate_plain_entry(pair: Pair<'_, Rule>) -> Result<Entry> {
             Rule::entry_tag => {
                 set_or_fail!(
                     tag,
-                    Tag(as_string!(subrule!(item).into_inner())),
+                    Tag(subrule!(item).into_inner().as_str().to_string()),
                     "tag",
                     loc
                 );
