@@ -1,6 +1,6 @@
 use crate::extract::{Amount, Tag};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     pub value: Amount,
     pub cat: Category,
@@ -8,7 +8,7 @@ pub struct Entry {
     pub tag: Tag,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Category {
     School,
     Food,
@@ -19,14 +19,14 @@ pub enum Category {
     Cleaning,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Span {
     pub duration: Duration,
     pub window: Window,
     pub count: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Duration {
     Day,
     Week,
@@ -34,7 +34,7 @@ pub enum Duration {
     Year,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Window {
     Current,
     Posterior,
