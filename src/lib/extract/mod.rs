@@ -4,8 +4,8 @@ pub mod parse;
 pub mod template;
 pub mod validate;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Amount(isize);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag(String);

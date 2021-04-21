@@ -6,7 +6,8 @@ use crate::extract::{
 
 #[derive(Debug)]
 pub struct Template<'i> {
-    pub arguments: Vec<(&'i str, Option<Arg<'i>>)>,
+    pub positional: Vec<&'i str>,
+    pub named: Vec<(&'i str, Arg<'i>)>,
     pub value: AmountTemplate<'i>,
     pub cat: Category,
     pub span: Span,

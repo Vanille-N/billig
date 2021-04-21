@@ -7,7 +7,7 @@ pub struct Instance<'i> {
 
 use crate::extract::Amount;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Arg<'i> {
     Amount(Amount),
     Tag(&'i str),

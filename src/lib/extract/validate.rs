@@ -164,7 +164,7 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
     assert_eq!(id.as_rule(), Rule::identifier);
     let identifier = id.as_str();
     assert_eq!(args.as_rule(), Rule::template_args);
-    let arguments = validate_args(args.into_inner())?;
+    let (positional, named) = validate_args(args.into_inner())?;
     assert_eq!(body.as_rule(), Rule::template_expansion_contents);
     let mut value: Option<AmountTemplate> = None;
     let mut cat: Option<Category> = None;
@@ -199,7 +199,8 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
     Ok((
         identifier,
         Template {
-            arguments,
+            positional,
+            named,
             value,
             cat,
             span,
@@ -208,12 +209,16 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
     ))
 }
 
-fn validate_args(pairs: Pairs<'_, Rule>) -> Result<Vec<(&str, Option<Arg>)>> {
-    let mut args = Vec::new();
+fn validate_args(pairs: Pairs<'_, Rule>) -> Result<(Vec<&str>, Vec<(&str, Arg)>)> {
+    let mut positional = Vec::new();
+    let mut named = Vec::new();
     for pair in pairs {
-        args.push(validate_arg(pair)?);
+        match validate_arg(pair)? {
+            (arg, None) => positional.push(arg),
+            (arg, Some(deflt)) => named.push((arg, deflt)),
+        }
     }
-    Ok(args)
+    Ok((positional, named))
 }
 
 fn validate_arg(pair: Pair<'_, Rule>) -> Result<(&str, Option<Arg>)> {
