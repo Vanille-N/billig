@@ -2,7 +2,7 @@ use pest::Parser;
 use pest_derive::*;
 
 #[derive(Parser)]
-#[grammar = "lib/extract/bilancio.pest"]
+#[grammar = "bilancio.pest"]
 pub struct BilancioParser;
 
 use std::fs;
