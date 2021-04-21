@@ -1,4 +1,4 @@
-use crate::extract::{Tag, Amount};
+use crate::extract::{Amount, Tag};
 
 #[derive(Debug)]
 pub struct Entry {

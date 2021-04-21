@@ -8,10 +8,7 @@ use crate::lib::extract::{
     Amount, Tag,
 };
 
-use crate::lib::date::{
-    Date,
-    Month,
-};
+use crate::lib::date::{Date, Month};
 
 #[derive(Debug)]
 pub enum AstItem {

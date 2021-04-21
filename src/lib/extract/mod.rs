@@ -1,8 +1,8 @@
-pub mod parse;
 pub mod entry;
-pub mod validate;
-pub mod template;
 pub mod instance;
+pub mod parse;
+pub mod template;
+pub mod validate;
 
 #[derive(Debug)]
 pub struct Amount(isize);

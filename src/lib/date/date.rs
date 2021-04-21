@@ -53,6 +53,9 @@ pub enum DateError {
 impl Date {
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
         use Month::*;
+        if year < 2000 || year > 4000 {
+            return Err(DateError::UnsupportedYear(year));
+        }
         if day > 31 || day == 0 {
             return Err(DateError::InvalidDay(year, month, day));
         } else if day == 31 {
@@ -89,7 +92,6 @@ fn is_bissextile(year: usize) -> bool {
         true
     }
 }
-    
 
 use std::fmt;
 impl fmt::Display for DateError {

@@ -1,8 +1,7 @@
 use crate::extract::{
-    Tag,
-    Amount,
     entry::{Category, Span},
     instance::Arg,
+    Amount, Tag,
 };
 
 #[derive(Debug)]
@@ -37,4 +36,3 @@ pub enum AmountTemplateItem {
     Cst(Amount),
     Arg(String),
 }
-
