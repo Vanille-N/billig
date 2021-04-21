@@ -353,6 +353,8 @@ fn validate_template_tag(pair: Pair<'_, Rule>) -> Result<TagTemplate> {
                 "@Day" => Day,
                 "@Month" => Month,
                 "@Year" => Year,
+                "@Date" => Date,
+                "@Weekday" => Weekday,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
@@ -378,9 +380,9 @@ fn validate_year(year: usize, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>
 fn validate_month(year: usize, month: Month, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> {
     let mut v = Vec::new();
     for pair in pairs {
-        let loc = pair.as_span().clone();
         assert_eq!(pair.as_rule(), Rule::entries_day);
         let (day, rest) = decapitate!(pair);
+        let loc = day.as_span().clone();
         let day = parse_usize!(day);
         match Date::from(year, month, day) {
             Ok(date) => {

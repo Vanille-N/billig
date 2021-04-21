@@ -22,6 +22,8 @@ pub enum TagTemplateItem<'i> {
     Day,
     Month,
     Year,
+    Date,
+    Weekday,
     Raw(&'i str),
     Arg(&'i str),
 }

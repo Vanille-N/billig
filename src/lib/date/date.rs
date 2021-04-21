@@ -42,6 +42,30 @@ impl Month {
     }
 }
 
+use std::fmt;
+impl fmt::Display for Month {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Weekday {
+    Mon,
+    Tue,
+    Wed,
+    Thu,
+    Fri,
+    Sat,
+    Sun,
+}
+impl fmt::Display for Weekday {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+
 #[derive(Clone, Debug)]
 pub enum DateError {
     UnsupportedYear(usize),
@@ -95,6 +119,29 @@ impl Date {
             })
         }
     }
+
+    pub fn day(&self) -> u8 {
+        self.day
+    }
+
+    pub fn month(&self) -> Month {
+        self.month
+    }
+
+    pub fn year(&self) -> u16 {
+        self.year
+    }
+
+    pub fn weekday(&self) -> Weekday {
+        Weekday::Mon
+        // TODO
+    }
+}
+
+impl fmt::Display for Date {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-{}-{:02}", self.year, self.month, self.day)
+    }
 }
 
 fn is_bissextile(year: usize) -> bool {
@@ -109,7 +156,6 @@ fn is_bissextile(year: usize) -> bool {
     }
 }
 
-use std::fmt;
 impl fmt::Display for DateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use DateError::*;

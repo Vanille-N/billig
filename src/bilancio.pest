@@ -40,7 +40,7 @@ entries_year = { marker_year ~ colon ~ entries_month+ }
 
 comment = { "//" ~ ( !"\n" ~ ANY )* }
 
-template_time = { "@Day" | "@Month" | "@Year" }
+template_time = { "@Day" | "@Month" | "@Year" | "@Date" | "@Weekday" }
 template_arg_expand = { "&" ~ identifier }
 template_value = { money_amount | template_arg_expand }
 template_string = { tag_text | template_arg_expand | template_time }
