@@ -22,17 +22,96 @@ use pest::{
     iterators::{Pair, Pairs},
 };
 
-fn failure(msg: &str, span: pest::Span) {
-    let err: Error<Rule> = Error::new_from_span(
-        ErrorVariant::CustomError {
-            message: String::from(msg),
-        },
-        span,
-    );
-    println!("{}", err);
+macro_rules! failure {
+    ( $msg:expr, $span:expr ) => {{
+        let err: Error<Rule> = Error::new_from_span(
+            ErrorVariant::CustomError {
+                message: $msg.to_string(),
+            },
+            $span,
+        );
+        return Err(err);
+    }};
 }
 
-pub fn validate(pairs: Pairs<'_, Rule>) -> Option<Ast> {
+macro_rules! subrule {
+    ( $node:expr, $rule:expr ) => {{
+        let node = $node;
+        assert_eq!(node.as_rule(), $rule);
+        let mut items = node.into_inner().into_iter();
+        let fst = items
+            .next()
+            .unwrap_or_else(|| panic!("{:?} has no subrule", $rule));
+        if items.next().is_some() {
+            panic!("{:?} has several subrules", $rule);
+        }
+        fst
+    }};
+    ( $node:expr ) => {{
+        let mut items = $node.into_inner().into_iter();
+        let fst = items.next().unwrap_or_else(|| panic!("No subrule"));
+        if items.next().is_some() {
+            panic!("Several subrules");
+        }
+        fst
+    }};
+}
+
+macro_rules! decapitate {
+    ( $node:expr ) => {{
+        let mut items = $node.into_inner().into_iter();
+        let fst = items.next().unwrap_or_else(|| panic!("No head"));
+        (fst, items)
+    }};
+}
+
+macro_rules! pair {
+    ( $node:expr ) => {{
+        let mut items = $node.into_inner().into_iter();
+        let fst = items.next().unwrap_or_else(|| panic!("No 1st"));
+        let snd = items.next().unwrap_or_else(|| panic!("No 2nd"));
+        assert!(items.next().is_none());
+        (fst, snd)
+    }};
+}
+
+macro_rules! triplet {
+    ( $node:expr ) => {{
+        let mut items = $node.into_inner().into_iter();
+        let fst = items.next().unwrap_or_else(|| panic!("No 1st"));
+        let snd = items.next().unwrap_or_else(|| panic!("No 2nd"));
+        let thr = items.next().unwrap_or_else(|| panic!("No 3rd"));
+        assert!(items.next().is_none());
+        (fst, snd, thr)
+    }};
+}
+
+macro_rules! parse_usize {
+    ( $node:expr ) => {
+        $node.as_str().parse::<usize>().unwrap()
+    };
+}
+
+macro_rules! parse_amount {
+    ( $node:expr ) => {
+        ($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize
+    };
+}
+
+macro_rules! as_string {
+    ( $node:expr ) => {
+        $node.as_str().to_string()
+    };
+}
+
+macro_rules! set_or_fail {
+    ( $var:expr, $val:expr, $name:expr, $loc:expr ) => {{
+        if $var.is_some() {
+            failure!(format!("Attempt to override {}", $name), $loc)
+        }
+        $var = Some($val);
+    }};
+}
     let mut ast = Vec::new();
     for pair in pairs {
         match pair.as_rule() {
