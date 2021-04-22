@@ -14,8 +14,10 @@ pub struct Error {
 enum ErrItem {
     Block(pest::error::Error<Rule>),
     Text(String),
+    Hint(String),
 }
 
+#[must_use]
 #[derive(Debug, Default)]
 pub struct ErrorRecord {
     fatal: usize,
@@ -53,9 +55,15 @@ impl Error {
         self
     }
 
-    pub fn with_message<S>(mut self, msg: S) -> Self
+    pub fn with_text<S>(mut self, msg: S) -> Self
     where S: ToString {
         self.items.push(ErrItem::Text(msg.to_string()));
+        self
+    }
+
+    pub fn with_hint<S>(mut self, msg: S) -> Self
+    where S: ToString {
+        self.items.push(ErrItem::Hint(msg.to_string()));
         self
     }
 
@@ -92,7 +100,7 @@ impl ErrorRecord {
 
 const RED: &str = "\x1b[0;91;1m";
 const YLW: &str = "\x1b[0;93;1m";
-const BLU: &str = "\x1b[0;36m";
+const BLU: &str = "\x1b[0;96;1m";
 const WHT: &str = "\x1b[0;1m";
 const NONE: &str = "\x1b[0m";
 
@@ -134,6 +142,9 @@ impl fmt::Display for Error {
                 ErrItem::Text(txt) => {
                     writeln!(f, "     {}|  {}{}{}", color, WHT, txt, NONE)?;
                 }
+                ErrItem::Hint(txt) => {
+                    writeln!(f, "     {}|      {}? hint: {}{}", color, BLU, NONE, txt)?;
+                }
             }
         }
         Ok(())
@@ -142,6 +153,9 @@ impl fmt::Display for Error {
 
 impl fmt::Display for ErrorRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.contents.is_empty() {
+            return Ok(());
+        }
         let fatal = self.is_fatal();
         let count = if fatal { self.count_errors() } else { self.count_warnings() };
         let color = if fatal { RED } else { YLW };
@@ -153,10 +167,11 @@ impl fmt::Display for ErrorRecord {
         if count > trunc {
             writeln!(f, "{} And {} more.", color, count - trunc)?;
         }
+        let plural = if count > 1 { "s" } else { "" };
         if fatal {
-            writeln!(f, "{}Fatal: {}{} errors produced{}", color, WHT, count, NONE)?;
+            writeln!(f, "{}Fatal: {}{} error{} emitted{}", color, WHT, count, plural, NONE)?;
         } else {
-            writeln!(f, "{}Nonfatal: {}{} warnings produced{}", color, WHT, count, NONE)?;
+            writeln!(f, "{}Nonfatal: {}{} warning{} emitted{}", color, WHT, count, plural, NONE)?;
         }
         Ok(())
     }
