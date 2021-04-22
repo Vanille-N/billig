@@ -8,7 +8,7 @@ use crate::lib::{
     entry::{self, Entry, Amount, Tag, Span, Category},
     template::{self, Arg, Instance, models::*},
     date::{Date, Month},
-    error::{Result, Error}
+    error::{ErrorRecord, Error, Loc}
 };
 
 pub mod ast {
@@ -27,17 +27,21 @@ pub type Ast<'i> = Vec<AstItem<'i>>;
 #[derive(Debug)]
 pub enum AstItem<'i> {
     Entry(Date, Entry),
-    Instance(Date, pest::Span<'i>, Instance<'i>),
-    Template(&'i str, pest::Span<'i>, Template<'i>),
+    Instance(Date, Loc<'i>, Instance<'i>),
+    Template(&'i str, Loc<'i>, Template<'i>),
 }
 
-pub fn extract(contents: &str) -> Result<Ast> {
+pub fn extract<'i>(path: &'i str, errs: &mut ErrorRecord, contents: &'i str) -> Ast<'i> {
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
-        Err(e) => return Err(Error::new("Parsing failure")
-            .with_error(e)),
+        Err(e) => {
+            Error::new("Parsing failure")
+                .with_error(e.with_path(path))
+                .register(errs);
+            return Vec::new();
+        }
     };
-    validate(contents)
+    validate(path, errs, contents)
 }
 
 // extract contents of wrapper rule
@@ -112,13 +116,14 @@ macro_rules! parse_amount {
 
 // set-once value
 macro_rules! set_or_fail {
-    ( $var:expr, $val:expr, $name:expr, $loc:expr ) => {{
+    ( $errs:expr, $var:expr, $val:expr, $name:expr, $loc:expr) => {{
         if $var.is_some() {
-            let err = Error::new("Duplicate field definition")
+            Error::new("Duplicate field definition")
                 .with_span(&$loc, format!("attempt to override {}", $name))
                 .with_message("Each field may only be defined once")
-                .with_message("Remove this field");
-            return Err(err);
+                .with_message("Remove this field")
+                .register($errs);
+            return None;
         }
         $var = Some($val);
     }};
@@ -126,37 +131,44 @@ macro_rules! set_or_fail {
 
 // non-optional value
 macro_rules! unwrap_or_fail {
-    ( $val:expr, $name:expr, $loc:expr ) => {{
+    ( $errs:expr, $val:expr, $name:expr, $loc:expr ) => {{
         match $val {
             Some(v) => v,
             None => {
-                let err = Error::new("Missing field definition")
+                Error::new("Missing field definition")
                     .with_span(&$loc, format!("'{}' may not be omitted", $name))
                     .with_message("Each field must be defined once")
-                    .with_message("Add definition for the missing field");
-                return Err(err);
+                    .with_message("Add definition for the missing field")
+                    .register($errs);
+                return None;
             }
         }
     }};
 }
 
-pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
+pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i, Rule>) -> Ast<'i> {
     let mut ast = Vec::new();
-    for pair in pairs {
+    'pairs: for pair in pairs {
         match pair.as_rule() {
             Rule::item => {
                 for item in pair.into_inner() {
-                    let loc = item.as_span().clone();
+                    let loc = (path, item.as_span().clone());
                     match item.as_rule() {
                         Rule::template_descriptor => {
-                            let (name, templ) = validate_template(item)?;
+                            let (name, templ) = match validate_template(path, errs, item) {
+                                Some(x) => x,
+                                None => continue 'pairs,
+                            };
                             ast.push(AstItem::Template(name, loc, templ));
                         }
                         Rule::entries_year => {
                             let (head, body) = decapitate!(item);
                             assert_eq!(head.as_rule(), Rule::marker_year);
                             let year = parse_usize!(head);
-                            let items = validate_year(year, body.collect::<Vec<_>>())?;
+                            let items = match validate_year(path, errs, year, body.collect::<Vec<_>>()) {
+                                Some(x) => x,
+                                None => continue 'pairs,
+                            };
                             for item in items {
                                 ast.push(item);
                             }
@@ -169,16 +181,16 @@ pub fn validate(pairs: Pairs<'_, Rule>) -> Result<Ast> {
             _ => unreachable!(),
         }
     }
-    Ok(ast)
+    ast
 }
 
-fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
-    let loc = pair.as_span().clone();
+fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<(&'i str, Template<'i>)> {
+    let loc = (path, pair.as_span().clone());
     let (id, args, body) = triplet!(pair);
     assert_eq!(id.as_rule(), Rule::identifier);
     let identifier = id.as_str();
     assert_eq!(args.as_rule(), Rule::template_args);
-    let (positional, named) = validate_args(args.into_inner())?;
+    let (positional, named) = read_args(args.into_inner());
     assert_eq!(body.as_rule(), Rule::template_expansion_contents);
     let mut value: Option<AmountTemplate> = None;
     let mut cat: Option<Category> = None;
@@ -188,29 +200,30 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
         match sub.as_rule() {
             Rule::template_val => {
                 set_or_fail!(
+                    errs,
                     value,
-                    validate_template_amount(subrule!(subrule!(sub), Rule::template_money_amount))?,
+                    read_template_amount(subrule!(subrule!(sub), Rule::template_money_amount)),
                     "val",
                     loc
                 );
             }
             Rule::entry_type => {
-                set_or_fail!(cat, validate_cat(subrule!(sub))?, "type", loc);
+                set_or_fail!(errs, cat, validate_cat(path, errs, subrule!(sub))?, "type", loc);
             }
             Rule::entry_span => {
-                set_or_fail!(span, validate_span(subrule!(sub))?, "span", loc);
+                set_or_fail!(errs, span, validate_span(path, errs, subrule!(sub))?, "span", loc);
             }
             Rule::template_tag => {
-                set_or_fail!(tag, validate_template_tag(subrule!(sub))?, "tag", loc);
+                set_or_fail!(errs, tag, validate_template_tag(path, errs, subrule!(sub))?, "tag", loc);
             }
             _ => unreachable!(),
         }
     }
-    let value = unwrap_or_fail!(value, "val", loc);
-    let cat = unwrap_or_fail!(cat, "cat", loc);
-    let span = unwrap_or_fail!(span, "span", loc);
-    let tag = unwrap_or_fail!(tag, "tag", loc);
-    Ok((
+    let value = unwrap_or_fail!(errs, value, "val", loc);
+    let cat = unwrap_or_fail!(errs, cat, "cat", loc);
+    let span = unwrap_or_fail!(errs, span, "span", loc);
+    let tag = unwrap_or_fail!(errs, tag, "tag", loc);
+    Some((
         identifier,
         Template {
             positional,
@@ -223,30 +236,30 @@ fn validate_template(pair: Pair<'_, Rule>) -> Result<(&str, Template)> {
     ))
 }
 
-fn validate_args(pairs: Pairs<'_, Rule>) -> Result<(Vec<&str>, Vec<(&str, Arg)>)> {
+fn read_args<'i>(pairs: Pairs<'i, Rule>) -> (Vec<&'i str>, Vec<(&'i str, Arg<'i>)>) {
     let mut positional = Vec::new();
     let mut named = Vec::new();
     for pair in pairs {
-        match validate_arg(pair)? {
+        match read_arg(pair) {
             (arg, None) => positional.push(arg),
             (arg, Some(deflt)) => named.push((arg, deflt)),
         }
     }
-    Ok((positional, named))
+    (positional, named)
 }
 
-fn validate_arg(pair: Pair<'_, Rule>) -> Result<(&str, Option<Arg>)> {
+fn read_arg<'i>(pair: Pair<'i, Rule>) -> (&'i str, Option<Arg<'i>>) {
     match pair.as_rule() {
         Rule::template_positional_arg => {
             let name = pair.as_str();
-            Ok((name, None))
+            (name, None)
         }
         Rule::template_named_arg => {
             let (name, default) = pair!(pair);
             let name = name.as_str();
             let default = {
                 match default.as_rule() {
-                    Rule::money_amount => Arg::Amount(validate_amount(default)?),
+                    Rule::money_amount => Arg::Amount(read_amount(default)),
                     Rule::tag_text => {
                         Arg::Tag(subrule!(default, Rule::tag_text).as_str())
                     }
@@ -255,18 +268,18 @@ fn validate_arg(pair: Pair<'_, Rule>) -> Result<(&str, Option<Arg>)> {
                     }
                 }
             };
-            Ok((name, Some(default)))
+            (name, Some(default))
         }
         _ => unreachable!(),
     }
 }
 
-fn validate_amount(item: Pair<'_, Rule>) -> Result<Amount> {
+fn read_amount<'i>(item: Pair<'i, Rule>) -> Amount {
     assert_eq!(item.as_rule(), Rule::money_amount);
-    Ok(Amount(parse_amount!(item)))
+    Amount(parse_amount!(item))
 }
 
-fn validate_template_amount(pair: Pair<'_, Rule>) -> Result<AmountTemplate> {
+fn read_template_amount<'i>(pair: Pair<'i, Rule>) -> AmountTemplate<'i> {
     let (sign, pair) = match pair.as_rule() {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
@@ -283,7 +296,7 @@ fn validate_template_amount(pair: Pair<'_, Rule>) -> Result<AmountTemplate> {
     for item in items {
         match item.as_rule() {
             Rule::money_amount => {
-                sum.push(AmountTemplateItem::Cst(validate_amount(item)?));
+                sum.push(AmountTemplateItem::Cst(read_amount(item)));
             }
             Rule::template_arg_expand => {
                 sum.push(AmountTemplateItem::Arg(subrule!(item).as_str()))
@@ -291,12 +304,12 @@ fn validate_template_amount(pair: Pair<'_, Rule>) -> Result<AmountTemplate> {
             _ => unreachable!(),
         }
     }
-    Ok(AmountTemplate { sign, sum })
+    AmountTemplate { sign, sum }
 }
 
-fn validate_cat(pair: Pair<'_, Rule>) -> Result<Category> {
+fn validate_cat<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Category> {
     use entry::Category::*;
-    Ok(match pair.as_str() {
+    Some(match pair.as_str() {
         "Pay" => Salary,
         "Food" => Food,
         "Com" => Communication,
@@ -308,7 +321,7 @@ fn validate_cat(pair: Pair<'_, Rule>) -> Result<Category> {
     })
 }
 
-fn validate_span(pair: Pair<'_, Rule>) -> Result<Span> {
+fn validate_span<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Span> {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
     let duration = match pair.next().unwrap().as_str() {
@@ -340,14 +353,14 @@ fn validate_span(pair: Pair<'_, Rule>) -> Result<Span> {
         pair.next();
     }
     let count = pair.next().map(|it| parse_usize!(it)).unwrap_or(1);
-    Ok(Span {
+    Some(Span {
         duration,
         window: window.unwrap_or(Current),
         count,
     })
 }
 
-fn validate_template_tag(pair: Pair<'_, Rule>) -> Result<TagTemplate> {
+fn validate_template_tag<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<TagTemplate<'i>> {
     let concat = match pair.as_rule() {
         Rule::builtin_concat => subrule!(pair)
             .into_inner()
@@ -374,68 +387,82 @@ fn validate_template_tag(pair: Pair<'_, Rule>) -> Result<TagTemplate> {
             _ => unreachable!(),
         });
     }
-    Ok(TagTemplate(strs))
+    Some(TagTemplate(strs))
 }
 
-fn validate_year(year: usize, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> {
+fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
     let mut v = Vec::new();
-    for pair in pairs {
+    'pairs: for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
         let (month, rest) = decapitate!(pair);
         let month = Month::from(month.as_str());
-        let items = validate_month(year, month, rest.collect::<Vec<_>>())?;
+        let items = match validate_month(path, errs, year, month, rest.collect::<Vec<_>>()) {
+            Some(x) => x,
+            None => continue 'pairs,
+        };
         for item in items {
             v.push(item);
         }
     }
-    Ok(v)
+    Some(v)
 }
 
-fn validate_month(year: usize, month: Month, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> {
+fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month: Month, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
     let mut v = Vec::new();
-    for pair in pairs {
+    'pairs: for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_day);
         let (day, rest) = decapitate!(pair);
-        let loc = day.as_span().clone();
+        let loc = (path, day.as_span().clone());
         let day = parse_usize!(day);
         match Date::from(year, month, day) {
             Ok(date) => {
-                let items = validate_day(date, rest.collect::<Vec<_>>())?;
+                let items = match validate_day(path, errs, date, rest.collect::<Vec<_>>()) {
+                    Some(x) => x,
+                    None => continue 'pairs,
+                };
                 for item in items {
                     v.push(item);
                 }
             }
             Err(e) => {
-                return Err(Error::new("Invalid date")
+                Error::new("Invalid date")
                     .with_span(&loc, "defined here")
-                    .with_message(format!("{}", e)))
+                    .with_message(format!("{}", e))
+                    .register(errs);
+                continue 'pairs;
             }
         }
     }
-    Ok(v)
+    Some(v)
 }
 
-fn validate_day(date: Date, pairs: Vec<Pair<'_, Rule>>) -> Result<Vec<AstItem>> {
+fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
     let mut v = Vec::new();
-    for pair in pairs {
+    'pairs: for pair in pairs {
         let entry = subrule!(pair, Rule::entry);
-        let loc = entry.as_span().clone();
+        let loc = (path, entry.as_span().clone());
         match entry.as_rule() {
             Rule::expand_entry => {
-                let res = validate_expand_entry(entry)?;
+                let res = match validate_expand_entry(path, errs, entry) {
+                    Some(x) => x,
+                    None => continue 'pairs,
+                };
                 v.push(AstItem::Instance(date.clone(), loc, res));
             }
             Rule::plain_entry => {
-                let res = validate_plain_entry(entry)?;
+                let res = match validate_plain_entry(path, errs, entry) {
+                    Some(x) => x,
+                    None => continue 'pairs,
+                };
                 v.push(AstItem::Entry(date.clone(), res));
             }
             _ => unreachable!(),
         }
     }
-    Ok(v)
+    Some(v)
 }
 
-fn validate_expand_entry(pairs: Pair<'_, Rule>) -> Result<Instance> {
+fn validate_expand_entry<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pair<'i, Rule>) -> Option<Instance<'i>> {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
     let mut pos = Vec::new();
@@ -443,23 +470,23 @@ fn validate_expand_entry(pairs: Pair<'_, Rule>) -> Result<Instance> {
     for arg in args.into_inner() {
         match arg.as_rule() {
             Rule::positional_arg => {
-                pos.push(validate_value(subrule!(arg)).unwrap());
+                pos.push(validate_value(path, errs, subrule!(arg)).unwrap());
             }
             Rule::named_arg => {
                 let (name, value) = pair!(arg);
                 let name = name.as_str();
-                let value = validate_value(subrule!(value)).unwrap();
+                let value = validate_value(path, errs, subrule!(value)).unwrap();
                 named.push((name, value));
             }
             _ => unreachable!(),
         }
     }
-    Ok(Instance { label, pos, named })
+    Some(Instance { label, pos, named })
 }
 
-fn validate_value(pair: Pair<'_, Rule>) -> Result<Arg<'_>> {
-    Ok(match pair.as_rule() {
-        Rule::money_amount => Arg::Amount(validate_amount(pair)?),
+fn validate_value<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Arg<'i>> {
+    Some(match pair.as_rule() {
+        Rule::money_amount => Arg::Amount(read_amount(pair)),
         Rule::tag_text => Arg::Tag(subrule!(pair).as_str()),
         _ => {
             unreachable!()
@@ -467,8 +494,8 @@ fn validate_value(pair: Pair<'_, Rule>) -> Result<Arg<'_>> {
     })
 }
 
-fn validate_plain_entry(pair: Pair<'_, Rule>) -> Result<Entry> {
-    let loc = pair.as_span().clone();
+fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair<'_, Rule>) -> Option<Entry> {
+    let loc = (path, pair.as_span().clone());
     let mut value: Option<Amount> = None;
     let mut cat: Option<Category> = None;
     let mut span: Option<Span> = None;
@@ -476,16 +503,17 @@ fn validate_plain_entry(pair: Pair<'_, Rule>) -> Result<Entry> {
     for item in pair.into_inner() {
         match item.as_rule() {
             Rule::entry_val => {
-                set_or_fail!(value, Amount(parse_amount!(subrule!(item))), "val", loc);
+                set_or_fail!(errs, value, Amount(parse_amount!(subrule!(item))), "val", loc);
             }
             Rule::entry_type => {
-                set_or_fail!(cat, validate_cat(subrule!(item))?, "cat", loc);
+                set_or_fail!(errs, cat, validate_cat(path, errs, subrule!(item))?, "cat", loc);
             }
             Rule::entry_span => {
-                set_or_fail!(span, validate_span(subrule!(item))?, "span", loc);
+                set_or_fail!(errs, span, validate_span(path, errs, subrule!(item))?, "span", loc);
             }
             Rule::entry_tag => {
                 set_or_fail!(
+                    errs,
                     tag,
                     Tag(subrule!(item).into_inner().as_str().to_string()),
                     "tag",
@@ -495,11 +523,11 @@ fn validate_plain_entry(pair: Pair<'_, Rule>) -> Result<Entry> {
             _ => unreachable!(),
         }
     }
-    let value = unwrap_or_fail!(value, "val", loc);
-    let cat = unwrap_or_fail!(cat, "cat", loc);
-    let span = unwrap_or_fail!(span, "span", loc);
-    let tag = unwrap_or_fail!(tag, "tag", loc);
-    Ok(Entry {
+    let value = unwrap_or_fail!(errs, value, "val", loc);
+    let cat = unwrap_or_fail!(errs, cat, "cat", loc);
+    let span = unwrap_or_fail!(errs, span, "span", loc);
+    let tag = unwrap_or_fail!(errs, tag, "tag", loc);
+    Some(Entry {
         value,
         cat,
         span,

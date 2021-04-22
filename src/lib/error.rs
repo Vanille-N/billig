@@ -1,7 +1,8 @@
 use crate::lib::parse::Rule;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Loc<'i> = (&'i str, pest::Span<'i>);
 
+#[must_use]
 #[derive(Debug)]
 pub struct Error {
     fatal: bool,
@@ -14,6 +15,12 @@ enum ErrItem {
     Block(pest::error::Error<Rule>),
     Text(String),
 }
+
+#[derive(Debug, Default)]
+pub struct ErrorRecord {
+    fatal: usize,
+    contents: Vec<Error>,
+}   
 
 impl Error {
     pub fn new<S>(msg: S) -> Self
@@ -35,14 +42,14 @@ impl Error {
         self
     }
 
-    pub fn with_span<S>(mut self, span: &pest::Span, msg: S) -> Self
+    pub fn with_span<S>(mut self, loc: &Loc, msg: S) -> Self
     where S: ToString {
         self.items.push(ErrItem::Block(pest::error::Error::new_from_span(
             pest::error::ErrorVariant::CustomError {
                 message: msg.to_string(),
             },
-            span.clone(),
-        )));
+            loc.1.clone(),
+        ).with_path(&loc.0.to_string())));
         self
     }
 
@@ -51,7 +58,41 @@ impl Error {
         self.items.push(ErrItem::Text(msg.to_string()));
         self
     }
+
+    pub fn register(self, record: &mut ErrorRecord) {
+        record.register(self);
+    }
 }
+
+impl ErrorRecord {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_fatal(&self) -> bool {
+        self.fatal > 0
+    }
+
+    pub fn count_errors(&self) -> usize {
+        self.fatal
+    }
+
+    pub fn count_warnings(&self) -> usize {
+        self.contents.len() - self.fatal
+    }
+
+    pub fn count(&self) -> usize {
+        self.contents.len()
+    }
+
+    pub fn register(&mut self, err: Error) {
+        if err.fatal {
+            self.fatal += 1;
+        }
+        self.contents.push(err);
+    }
+}
+
 
 const RED: &'static str = "\x1b[0;91;1m";
 const YLW: &'static str = "\x1b[0;93;1m";
@@ -63,16 +104,16 @@ use std::fmt;
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (color, header) = if self.fatal {
-            (RED, "Error")
+            (RED, "--> Error")
         } else {
-            (YLW, "Warning")
+            (YLW, "--> Warning")
         }; 
         write!(f, "{}{}:{} {}{}\n", color, header, WHT, self.label, NONE)?;
         for item in &self.items {
             match item {
                 ErrItem::Block(err) => {
                     for line in format!("{}", err).split('\n') {
-                        write!(f, "  {}|  {}", color, BLU)?;
+                        write!(f, "     {}|  {}", color, BLU)?;
                         for c in line.chars() {
                             match c {
                                 '|' => write!(f, "|{}", NONE)?,
@@ -85,13 +126,36 @@ impl fmt::Display for Error {
                     }
                 }
                 ErrItem::Text(txt) => {
-                    write!(f, "  {}|  {}{}{}\n", color, WHT, txt, NONE)?;
+                    write!(f, "     {}|  {}{}{}\n", color, WHT, txt, NONE)?;
                 }
             }
         }
         Ok(())
     }
 }
+
+impl fmt::Display for ErrorRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fatal = self.is_fatal();
+        let count = if fatal { self.count_errors() } else { self.count_warnings() };
+        let color = if fatal { RED } else { YLW };
+        let trunc = 10;
+        for err in self.contents.iter().filter(|err| err.fatal == fatal).take(trunc) {
+            // only print errors with the maximum fatality
+            write!(f, "{}\n", err)?;
+        }
+        if count > trunc {
+            write!(f, "{} And {} more.", color, count - trunc)?;
+        }
+        if fatal {
+            write!(f, "{}Fatal: {}{} errors produced{}\n", color, WHT, count, NONE)?;
+        } else {
+            write!(f, "{}Nonfatal: {}{} warnings produced{}\n", color, WHT, count, NONE)?;
+        }
+        Ok(())
+    }
+}
+
 
 fn rule_rename(rule: &Rule) -> String {
     use Rule::*;

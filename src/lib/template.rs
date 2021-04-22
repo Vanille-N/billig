@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
     parse::ast::*,
-    error::{Result, Error},
+    error::{Error, ErrorRecord, Loc},
     entry::{Entry, fields::*},
     date::Date,
 };
@@ -64,54 +64,61 @@ pub enum AmountTemplateItem<'i> {
     Arg(&'i str),
 }
 
-pub fn instanciate(ast: Ast<'_>) -> Result<Vec<(Date, Entry)>> {
+pub fn instanciate(errs: &mut ErrorRecord, ast: Ast<'_>) -> Vec<(Date, Entry)> {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
-    for item in ast {
+    'ast: for item in ast {
         match item {
             AstItem::Entry(date, entry) => entries.push((date, entry)),
             AstItem::Template(name, loc, body) => {
                 templates.insert(name.to_string(), (loc, body));
             }
             AstItem::Instance(date, loc, instance) => {
-                let inst = instanciate_item(instance, date, loc, &templates)?;
-                entries.push((date, inst));
+                match instanciate_item(errs, instance, date, &loc, &templates) {
+                    Some(inst) => entries.push((date, inst)),
+                    None => continue 'ast,
+                }
             }
         }
     }
-    Ok(entries)
+    entries
 }
 
 fn instanciate_item(
+    errs: &mut ErrorRecord,
     instance: Instance<'_>,
     date: Date,
-    loc: pest::Span,
-    templates: &HashMap<String, (pest::Span, Template)>,
-) -> Result<Entry> {
+    loc: &Loc,
+    templates: &HashMap<String, (Loc, Template)>,
+) -> Option<Entry> {
     let templ = match templates.get(instance.label) {
         None => {
-            return Err(Error::new("Undeclared template")
-                .with_span(&loc, format!("attempt to instanciate {}", instance.label))
-                .with_message("Maybe a typo ?"));
+            Error::new("Undeclared template")
+                .with_span(loc, format!("attempt to instanciate {}", instance.label))
+                .with_message("Maybe a typo ?")
+                .register(errs);
+            return None;
         }
         Some(t) => t,
     };
-    let args = build_arguments(&instance, &loc, templ)?;
-    perform_replacements(&instance.label, &loc, templ, args, date)
+    let args = build_arguments(errs, &instance, loc, templ)?;
+    perform_replacements(errs, &instance.label, loc, templ, args, date)
 }
 
 fn build_arguments<'i>(
+    errs: &mut ErrorRecord,
     instance: &Instance<'i>,
-    loc: &pest::Span,
-    template: &(pest::Span<'i>, Template<'i>),
-) -> Result<HashMap<String, Arg<'i>>> {
+    loc: &Loc,
+    template: &(Loc<'i>, Template<'i>),
+) -> Option<HashMap<String, Arg<'i>>> {
     // check number of positional arguments
     if instance.pos.len() != template.1.positional.len() {
-        let err = Error::new("Argcount mismatch")
+        Error::new("Argcount mismatch")
             .with_span(loc, format!("instanciation provides {} arguments", instance.pos.len()))
             .with_span(&template.0, format!("template expects {} arguments", template.1.positional.len()))
-            .with_message("Fix the count mismatch");
-        return Err(err);
+            .with_message("Fix the count mismatch")
+            .register(errs);
+        return None;
     }
     let mut args = HashMap::new();
     for (name, val) in template.1.positional.iter().zip(instance.pos.iter()) {
@@ -124,44 +131,45 @@ fn build_arguments<'i>(
     for (name, val) in instance.named.iter() {
         args.insert(name.to_string(), *val);
     }
-    Ok(args)
+    Some(args)
 }
 
 fn perform_replacements(
+    errs: &mut ErrorRecord,
     name: &str,
-    loc: &pest::Span,
-    templ: &(pest::Span, Template),
+    loc: &Loc,
+    templ: &(Loc, Template),
     args: HashMap<String, Arg>,
     date: Date,
-) -> Result<Entry> {
-    let (value, used_val) = instantiate_amount(name, loc, &templ.0, &templ.1.value, &args)?;
-    let (tag, used_tag) = instanciate_tag(name, loc, &templ.0, &templ.1.tag, &args, date)?;
+) -> Option<Entry> {
+    let (value, used_val) = instantiate_amount(errs, name, loc, &templ.0, &templ.1.value, &args)?;
+    let (tag, used_tag) = instanciate_tag(errs, name, loc, &templ.0, &templ.1.tag, &args, date)?;
     for (argname, argval) in args.iter() {
         let use_v = used_val.contains(argname);
         let use_t = used_tag.contains(argname);
         match (argval, use_v, use_t) {
             (_, false, false) => {
-                let err = Error::new("Unused argument")
+                Error::new("Unused argument")
                     .nonfatal()
-                    .with_span(loc, format!("in instanciation of '{}'", name))
+                    .with_span(&loc, format!("in instanciation of '{}'", name))
                     .with_message(format!("Argument {} is provided but not used", argname))
                     .with_span(&templ.0, "defined here")
-                    .with_message("Remove argument or use in template");
-                println!("{}", err);
+                    .with_message("Remove argument or use in template")
+                    .register(errs);
             }
             (Arg::Amount(_), false, true) => {
-                let err = Error::new("Needless amount")
+                Error::new("Needless amount")
                     .nonfatal()
-                    .with_span(loc, format!("in instanciation of '{}'", name))
+                    .with_span(&loc, format!("in instanciation of '{}'", name))
                     .with_message(format!("Argument '{}' has type 'amount' but could be a 'tag'", argname))
                     .with_span(&templ.0, "defined here")
-                    .with_message("Change to string or use in amount calculation");
-                println!("{}", err);
+                    .with_message("Change to string or use in amount calculation")
+                    .register(errs);
             }
             _ => (),
         }
     }
-    Ok(Entry {
+    Some(Entry {
         value,
         cat: templ.1.cat,
         span: templ.1.span,
@@ -170,12 +178,13 @@ fn perform_replacements(
 }
 
 fn instantiate_amount(
+    errs: &mut ErrorRecord,
     name: &str,
-    loc_inst: &pest::Span,
-    loc_templ: &pest::Span,
+    loc_inst: &Loc,
+    loc_templ: &Loc,
     templ: &AmountTemplate,
     args: &HashMap<String, Arg>,
-) -> Result<(Amount, HashSet<String>)> {
+) -> Option<(Amount, HashSet<String>)> {
     let mut sum = 0;
     let mut used = HashSet::new();
     for item in &templ.sum {
@@ -185,37 +194,40 @@ fn instantiate_amount(
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {
-                        let err = Error::new("Missing argument")
+                        Error::new("Missing argument")
                             .with_span(loc_inst, format!("in instanciation of '{}'", name))
                             .with_message(format!("Argument '{}' is not provided", a))
                             .with_span(loc_templ, "defined here")
-                            .with_message("Remove argument from template body or provide a default value");
-                        return Err(err);
+                            .with_message("Remove argument from template body or provide a default value")
+                            .register(errs);
+                        return None;
                     }
                     Some(Arg::Amount(Amount(n))) => sum += n,
                     Some(Arg::Tag(_)) => {
-                        let err = Error::new("Type mismatch")
+                        Error::new("Type mismatch")
                             .with_span(loc_inst, format!("in instanciation of '{}'", name))
                             .with_message(format!("Cannot treat tag as a monetary value"))
                             .with_span(loc_templ, "defined here")
-                            .with_message("Make it a value");
-                        return Err(err);
+                            .with_message("Make it a value")
+                            .register(errs);
+                        return None;
                     }
                 }
             }
         }
     }
-    Ok((Amount(if templ.sign { sum } else { -sum }), used))
+    Some((Amount(if templ.sign { sum } else { -sum }), used))
 }
 
 fn instanciate_tag(
+    errs: &mut ErrorRecord,
     name: &str,
-    loc_inst: &pest::Span,
-    loc_templ: &pest::Span,
+    loc_inst: &Loc,
+    loc_templ: &Loc,
     templ: &TagTemplate,
     args: &HashMap<String, Arg>,
     date: Date,
-) -> Result<(Tag, HashSet<String>)> {
+) -> Option<(Tag, HashSet<String>)> {
     let mut tag = String::new();
     let mut used = HashSet::new();
     for item in &templ.0 {
@@ -230,12 +242,13 @@ fn instanciate_tag(
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {
-                        let err = Error::new("Missing argument")
+                        Error::new("Missing argument")
                             .with_span(loc_inst, format!("in instanciation of '{}'", name))
                             .with_message(format!("Argument '{}' is not provided", a))
                             .with_span(loc_templ, "defined here")
-                            .with_message("Remove argument from template body or provide a default value");
-                        return Err(err);
+                            .with_message("Remove argument from template body or provide a default value")
+                            .register(errs);
+                        return None;
                     }
                     Some(Arg::Amount(amount)) => tag.push_str(&amount.to_string()),
                     Some(Arg::Tag(t)) => tag.push_str(t),
@@ -243,5 +256,5 @@ fn instanciate_tag(
             }
         }
     }
-    Ok((Tag(tag), used))
+    Some((Tag(tag), used))
 }
