@@ -1,3 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use pest_derive::*;
 use pest::{
     Parser,
@@ -165,10 +167,7 @@ pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i, Rule
                             let (head, body) = decapitate!(item);
                             assert_eq!(head.as_rule(), Rule::marker_year);
                             let year = parse_usize!(head);
-                            let items = match validate_year(path, errs, year, body.collect::<Vec<_>>()) {
-                                Some(x) => x,
-                                None => continue 'pairs,
-                            };
+                            let items = validate_year(path, errs, year, body.collect::<Vec<_>>());
                             for item in items {
                                 ast.push(item);
                             }
@@ -236,7 +235,7 @@ fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, R
     ))
 }
 
-fn read_args<'i>(pairs: Pairs<'i, Rule>) -> (Vec<&'i str>, Vec<(&'i str, Arg<'i>)>) {
+fn read_args(pairs: Pairs<'_, Rule>) -> (Vec<&str>, Vec<(&str, Arg)>) {
     let mut positional = Vec::new();
     let mut named = Vec::new();
     for pair in pairs {
@@ -248,7 +247,7 @@ fn read_args<'i>(pairs: Pairs<'i, Rule>) -> (Vec<&'i str>, Vec<(&'i str, Arg<'i>
     (positional, named)
 }
 
-fn read_arg<'i>(pair: Pair<'i, Rule>) -> (&'i str, Option<Arg<'i>>) {
+fn read_arg(pair: Pair<'_, Rule>) -> (&str, Option<Arg>) {
     match pair.as_rule() {
         Rule::template_positional_arg => {
             let name = pair.as_str();
@@ -274,12 +273,12 @@ fn read_arg<'i>(pair: Pair<'i, Rule>) -> (&'i str, Option<Arg<'i>>) {
     }
 }
 
-fn read_amount<'i>(item: Pair<'i, Rule>) -> Amount {
+fn read_amount(item: Pair<'_, Rule>) -> Amount {
     assert_eq!(item.as_rule(), Rule::money_amount);
     Amount(parse_amount!(item))
 }
 
-fn read_template_amount<'i>(pair: Pair<'i, Rule>) -> AmountTemplate<'i> {
+fn read_template_amount(pair: Pair<'_, Rule>) -> AmountTemplate {
     let (sign, pair) = match pair.as_rule() {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
@@ -307,7 +306,7 @@ fn read_template_amount<'i>(pair: Pair<'i, Rule>) -> AmountTemplate<'i> {
     AmountTemplate { sign, sum }
 }
 
-fn read_cat<'i>(pair: Pair<'i, Rule>) -> Category {
+fn read_cat(pair: Pair<'_, Rule>) -> Category {
     use entry::Category::*;
     match pair.as_str() {
         "Pay" => Salary,
@@ -321,7 +320,7 @@ fn read_cat<'i>(pair: Pair<'i, Rule>) -> Category {
     }
 }
 
-fn read_span<'i>(pair: Pair<'i, Rule>) -> Span {
+fn read_span(pair: Pair<'_, Rule>) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
     let duration = match pair.next().unwrap().as_str() {
@@ -360,7 +359,7 @@ fn read_span<'i>(pair: Pair<'i, Rule>) -> Span {
     }
 }
 
-fn read_template_tag<'i>(pair: Pair<'i, Rule>) -> TagTemplate<'i> {
+fn read_template_tag(pair: Pair<'_, Rule>) -> TagTemplate {
     let concat = match pair.as_rule() {
         Rule::builtin_concat => subrule!(pair)
             .into_inner()
@@ -390,24 +389,21 @@ fn read_template_tag<'i>(pair: Pair<'i, Rule>) -> TagTemplate<'i> {
     TagTemplate(strs)
 }
 
-fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
+fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
-    'pairs: for pair in pairs {
+    for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
         let (month, rest) = decapitate!(pair);
         let month = Month::from(month.as_str());
-        let items = match validate_month(path, errs, year, month, rest.collect::<Vec<_>>()) {
-            Some(x) => x,
-            None => continue 'pairs,
-        };
+        let items = validate_month(path, errs, year, month, rest.collect::<Vec<_>>());
         for item in items {
             v.push(item);
         }
     }
-    Some(v)
+    v
 }
 
-fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month: Month, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
+fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month: Month, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
     'pairs: for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_day);
@@ -416,10 +412,7 @@ fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month:
         let day = parse_usize!(day);
         match Date::from(year, month, day) {
             Ok(date) => {
-                let items = match validate_day(path, errs, date, rest.collect::<Vec<_>>()) {
-                    Some(x) => x,
-                    None => continue 'pairs,
-                };
+                let items = validate_day(path, errs, date, rest.collect::<Vec<_>>());
                 for item in items {
                     v.push(item);
                 }
@@ -433,10 +426,10 @@ fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month:
             }
         }
     }
-    Some(v)
+    v
 }
 
-fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
+fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
     'pairs: for pair in pairs {
         let entry = subrule!(pair, Rule::entry);
@@ -444,22 +437,22 @@ fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Ve
         match entry.as_rule() {
             Rule::expand_entry => {
                 let res = read_expand_entry(entry);
-                v.push(AstItem::Instance(date.clone(), loc, res));
+                v.push(AstItem::Instance(date, loc, res));
             }
             Rule::plain_entry => {
                 let res = match validate_plain_entry(path, errs, entry) {
                     Some(x) => x,
                     None => continue 'pairs,
                 };
-                v.push(AstItem::Entry(date.clone(), res));
+                v.push(AstItem::Entry(date, res));
             }
             _ => unreachable!(),
         }
     }
-    Some(v)
+    v
 }
 
-fn read_expand_entry<'i>(pairs: Pair<'i, Rule>) -> Instance<'i> {
+fn read_expand_entry(pairs: Pair<'_, Rule>) -> Instance {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
     let mut pos = Vec::new();
@@ -481,7 +474,7 @@ fn read_expand_entry<'i>(pairs: Pair<'i, Rule>) -> Instance<'i> {
     Instance { label, pos, named }
 }
 
-fn read_value<'i>(pair: Pair<'i, Rule>) -> Arg<'i> {
+fn read_value(pair: Pair<'_, Rule>) -> Arg {
     match pair.as_rule() {
         Rule::money_amount => Arg::Amount(read_amount(pair)),
         Rule::tag_text => Arg::Tag(subrule!(pair).as_str()),

@@ -206,7 +206,7 @@ fn instantiate_amount(
                     Some(Arg::Tag(_)) => {
                         Error::new("Type mismatch")
                             .with_span(loc_inst, format!("in instanciation of '{}'", name))
-                            .with_message(format!("Cannot treat tag as a monetary value"))
+                            .with_message("Cannot treat tag as a monetary value".to_string())
                             .with_span(loc_templ, "defined here")
                             .with_message("Make it a value")
                             .register(errs);

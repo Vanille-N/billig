@@ -1,7 +1,7 @@
 mod lib;
 
 fn main() {
-    let filename = std::env::args().skip(1).next().unwrap_or("data.bil".to_string());
+    let filename = std::env::args().nth(1).unwrap_or_else(|| "data.bil".to_string());
     let contents = std::fs::read_to_string(&filename).expect("File not found");
 
     let mut errs = lib::error::ErrorRecord::new();

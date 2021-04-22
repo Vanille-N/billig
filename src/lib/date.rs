@@ -78,11 +78,10 @@ pub enum DateError {
 impl Date {
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
         use Month::*;
-        if year < 2000 || year > 4000 {
-            return Err(DateError::UnsupportedYear(year));
-        }
-        if day > 31 || day == 0 {
-            return Err(DateError::InvalidDay(year, month, day));
+        if !(2000..=4000).contains(&year) {
+            Err(DateError::UnsupportedYear(year))
+        } else if day > 31 || day == 0 {
+            Err(DateError::InvalidDay(year, month, day))
         } else if day == 31 {
             match month {
                 Jan | Mar | May | Jul | Aug | Oct | Dec => Ok(Self {
@@ -150,10 +149,8 @@ fn is_bissextile(year: usize) -> bool {
         false
     } else if year % 100 != 0 {
         true
-    } else if year % 4 != 0 {
-        false
     } else {
-        true
+        year % 4 == 0
     }
 }
 

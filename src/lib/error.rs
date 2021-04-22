@@ -81,10 +81,6 @@ impl ErrorRecord {
         self.contents.len() - self.fatal
     }
 
-    pub fn count(&self) -> usize {
-        self.contents.len()
-    }
-
     pub fn register(&mut self, err: Error) {
         if err.fatal {
             self.fatal += 1;
@@ -94,11 +90,11 @@ impl ErrorRecord {
 }
 
 
-const RED: &'static str = "\x1b[0;91;1m";
-const YLW: &'static str = "\x1b[0;93;1m";
-const BLU: &'static str = "\x1b[0;36m";
-const WHT: &'static str = "\x1b[0;1m";
-const NONE: &'static str = "\x1b[0m";
+const RED: &str = "\x1b[0;91;1m";
+const YLW: &str = "\x1b[0;93;1m";
+const BLU: &str = "\x1b[0;36m";
+const WHT: &str = "\x1b[0;1m";
+const NONE: &str = "\x1b[0m";
 
 use std::fmt;
 impl fmt::Display for Error {
@@ -142,15 +138,15 @@ impl fmt::Display for ErrorRecord {
         let trunc = 10;
         for err in self.contents.iter().filter(|err| err.fatal == fatal).take(trunc) {
             // only print errors with the maximum fatality
-            write!(f, "{}\n", err)?;
+            writeln!(f, "{}", err)?;
         }
         if count > trunc {
-            write!(f, "{} And {} more.", color, count - trunc)?;
+            writeln!(f, "{} And {} more.", color, count - trunc)?;
         }
         if fatal {
-            write!(f, "{}Fatal: {}{} errors produced{}\n", color, WHT, count, NONE)?;
+            writeln!(f, "{}Fatal: {}{} errors produced{}", color, WHT, count, NONE)?;
         } else {
-            write!(f, "{}Nonfatal: {}{} warnings produced{}\n", color, WHT, count, NONE)?;
+            writeln!(f, "{}Nonfatal: {}{} warnings produced{}", color, WHT, count, NONE)?;
         }
         Ok(())
     }
