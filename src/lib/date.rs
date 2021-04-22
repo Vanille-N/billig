@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Date {
     year: u16,
     month: Month,
@@ -67,7 +67,7 @@ impl fmt::Display for Weekday {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateError {
     UnsupportedYear(usize),
     NotBissextile(usize),
@@ -145,10 +145,10 @@ impl fmt::Display for Date {
 }
 
 fn is_bissextile(year: usize) -> bool {
-    if year % 400 != 0 {
-        false
-    } else if year % 100 != 0 {
+    if year % 400 == 0 {
         true
+    } else if year % 100 == 0 {
+        false
     } else {
         year % 4 == 0
     }
@@ -167,5 +167,86 @@ impl fmt::Display for DateError {
             ),
             InvalidDay(y, m, d) => writeln!(f, "In {} {:?}: {} is not a valid day", y, m, d),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{
+        *,
+        Month::*,
+    };
+
+    #[test]
+    fn bissextile_check() {
+        macro_rules! yes {
+            ( $y:expr ) => { assert!(is_bissextile($y)); }
+        }
+        macro_rules! no {
+            ( $y:expr ) => { assert!(!is_bissextile($y)); }
+        }
+        yes!(2004);
+        no!(2100);
+        yes!(2000);
+        no!(2001);
+        no!(2010);
+        yes!(2012);
+    }
+
+    macro_rules! ok {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            assert_eq!(Date::from($y, $m, $d), Ok(Date { year: $y, month: $m, day: $d }));
+        }
+    }
+    macro_rules! short {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            assert_eq!(Date::from($y, $m, $d), Err(DateError::MonthTooShort($y, $m, $d)));
+        }
+    }
+    macro_rules! nbiss {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            assert_eq!(Date::from($y, $m, $d), Err(DateError::NotBissextile($y)));
+        }
+    }
+    macro_rules! invalid {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            assert_eq!(Date::from($y, $m, $d), Err(DateError::InvalidDay($y, $m, $d)));
+        }
+    }
+    
+    #[test]
+    fn long_months() {
+        ok!(2020-Jan-31);
+        ok!(2020-Mar-31);
+        short!(2020-Apr-31);
+        ok!(2020-May-31);
+        short!(2020-Jun-31);
+        ok!(2020-Jul-31);
+        ok!(2020-Aug-31);
+        short!(2020-Sep-31);
+        ok!(2020-Oct-31);
+        short!(2020-Nov-31);
+        ok!(2020-Dec-31);
+    }
+
+    #[test]
+    fn normal_days() {
+        invalid!(2020-Dec-45);
+        invalid!(2020-Jan-32);
+        invalid!(2020-Jan-0);
+        ok!(2020-Mar-20);
+        ok!(2020-Apr-10);
+    }
+
+    #[test]
+    fn february() {
+        short!(2020-Feb-31);
+        short!(2020-Feb-30);
+        ok!(2020-Feb-29);
+        ok!(2020-Feb-28);
+        short!(2021-Feb-31);
+        short!(2021-Feb-30);
+        nbiss!(2021-Feb-29);
+        ok!(2021-Feb-28);
     }
 }
