@@ -1,4 +1,7 @@
 /target
+TODO
 
 # *.bil files may contain sensitive information
 *.bil
+# but examples are safe
+!examples/**/*.bil
