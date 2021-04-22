@@ -1,0 +1,19 @@
+// let's just create many different errors
+!sum a b c=0 {
+    val @Sum *a *b *c,
+    type Home,
+    span Day,
+    tag "",
+}
+
+2020:
+    Sep:
+        01: !sum 0 1 2 3;
+            !sum "abc" "def";
+        02: !sum "foo";
+        05: !sum; !sum; !sum; !sum;
+        06: !sum "eeeee";
+        07: !sum "abc";
+        08: !sum "bar";
+        09: !sum "baz";
+        10: !sum "quux";

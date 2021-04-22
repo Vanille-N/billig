@@ -1,0 +1,10 @@
+!sum a b="foo" {
+    val @Sum *a *b,
+    type Food,
+    span Day,
+    tag "",
+}
+
+2020:
+    Sep:
+        01: !sum "bar";

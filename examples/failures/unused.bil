@@ -1,0 +1,10 @@
+!self-sufficient unused extra="" {
+    val 0,
+    type Food,
+    span Day,
+    tag "eggs",
+}
+
+2020:
+    Sep:
+        01: !self-sufficient 0 other="";

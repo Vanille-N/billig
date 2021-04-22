@@ -1,0 +1,10 @@
+!empty {
+    val @Sum *foo,
+    type Food,
+    span Day,
+    tag *bar,
+}
+
+2020:
+    Sep:
+        01: !empty;

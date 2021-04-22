@@ -1,0 +1,12 @@
+!num one two three extra="foo" {
+    val @Sum *one *two *three,
+    type Food,
+    span Year<Post> 10,
+    tag @Concat "before " *extra " after",
+}
+
+2020:
+    Sep:
+        01: !num 1 2 3;
+            !num 1 2 3 extra="bar";
+            !num 2 3 extra="bar";
