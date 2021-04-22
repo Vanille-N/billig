@@ -1,5 +1,5 @@
 " Vim syntax file
-" Language: Bilancio DSL
+" Language: Billig DSL
 " Maintainer: Neven Villani (Vanille-N)
 " Lastest Revision: 21 April 2021
 
@@ -8,17 +8,17 @@ if exists("b:current_syntax")
 endif
 
 syn keyword bilKeyword val type span tag
-syn keyword bilCategory Food Clean Home Pay Scol Com Mov
+syn keyword bilCategory Food Clean Home Pay Pro Com Mov
 syn keyword bilWindow Post Curr Ante Pred Succ
 syn keyword bilDuration Day Week Month Year
 
 syn match bilMoneyAmount '-\?\d\+\(.\d\d\?\)\?'
 syn match bilBuiltin '@[[:alpha:]]\+'
-syn match bilArgExpand '&\([[:alpha:]]\|_\)\+'
-syn match bilTemplate '!\([[:alpha:]]\|_\)\+'
+syn match bilArgExpand '*\([[:alpha:]]\|_\)\+'
+syn match bilTemplate '!\([[:alpha:]]\|_\|-\)\+'
 syn match bilMarker '\([[:alpha:]]\+\|[[:digit:]]\+\):'
 
-syn region bilString start=/'/ end=/'/
+syn region bilString start=/"/ end=/"/
 syn region bilComment start=/\/\// end=/\n/
 
 let b:current_syntax = "bil"
