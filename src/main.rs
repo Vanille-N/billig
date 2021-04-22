@@ -1,23 +1,22 @@
 mod lib;
-use lib::extract;
-use lib::instanciate;
 
 fn main() {
-    let filename = "data.bil";
+    let filename = std::env::args().skip(1).next().unwrap_or("data.bil".to_string());
     let contents = std::fs::read_to_string(filename).expect("File not found");
 
-    let data = match extract::parse::extract(&contents) {
+    let data = match lib::parse::extract(&contents) {
         Ok(data) => data,
         Err(err) => {
             println!("{}", err);
             panic!();
         }
     };
-    let pairs = match instanciate::instanciate(data) {
+    let pairs = match lib::template::instanciate(data) {
         Ok(pairs) => pairs,
         Err(err) => {
             println!("{}", err);
             panic!();
         }
     };
+    println!("{:#?}", pairs);
 }
