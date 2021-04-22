@@ -104,25 +104,35 @@ impl fmt::Display for Error {
         } else {
             (YLW, "--> Warning")
         }; 
-        write!(f, "{}{}:{} {}{}\n", color, header, WHT, self.label, NONE)?;
+        writeln!(f, "{}{}:{} {}{}", color, header, WHT, self.label, NONE)?;
         for item in &self.items {
             match item {
                 ErrItem::Block(err) => {
+                    let mut align = "   ".to_string();
+                    let mut align_found = false;
                     for line in format!("{}", err).split('\n') {
-                        write!(f, "     {}|  {}", color, BLU)?;
+                        write!(f, "     {}|{}  {}", color, if align_found { &align } else { "" }, BLU)?;
                         for c in line.chars() {
                             match c {
+                                '-' if !align_found => {
+                                    align_found = true;
+                                    write!(f, "{}-", align)?;
+                                }
+                                ' ' if !align_found => {
+                                    align.pop();
+                                    write!(f, " ")?;
+                                }
                                 '|' => write!(f, "|{}", NONE)?,
                                 '=' => write!(f, "={}", NONE)?,
                                 '^' => write!(f, "{}^", color)?,
                                 _ => write!(f, "{}", c)?,
                             }
                         }
-                        write!(f, "\n")?;
+                        writeln!(f)?;
                     }
                 }
                 ErrItem::Text(txt) => {
-                    write!(f, "     {}|  {}{}{}\n", color, WHT, txt, NONE)?;
+                    writeln!(f, "     {}|  {}{}{}", color, WHT, txt, NONE)?;
                 }
             }
         }
