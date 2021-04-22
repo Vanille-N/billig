@@ -122,8 +122,8 @@ macro_rules! set_or_fail {
         if $var.is_some() {
             Error::new("Duplicate field definition")
                 .with_span(&$loc, format!("attempt to override {}", $name))
-                .with_message("Each field may only be defined once")
-                .with_message("Remove this field")
+                .with_text("Each field may only be defined once")
+                .with_hint("remove one of the field definitions")
                 .register($errs);
             return None;
         }
@@ -137,10 +137,18 @@ macro_rules! unwrap_or_fail {
         match $val {
             Some(v) => v,
             None => {
+                let name = $name;
+                let hint_value = match name {
+                    "tag" => "\"Some information\"",
+                    "val" => "42.0",
+                    "span" => "Year<Succ> 1",
+                    "type" => "Food",
+                    _ => unreachable!(),
+                };
                 Error::new("Missing field definition")
-                    .with_span(&$loc, format!("'{}' may not be omitted", $name))
-                    .with_message("Each field must be defined once")
-                    .with_message("Add definition for the missing field")
+                    .with_span(&$loc, format!("'{}' may not be omitted", name))
+                    .with_text("Each field must be defined once")
+                    .with_hint(format!("add definition for the missing field: '{} {}'", name, hint_value))
                     .register($errs);
                 return None;
             }
@@ -420,7 +428,8 @@ fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month:
             Err(e) => {
                 Error::new("Invalid date")
                     .with_span(&loc, "defined here")
-                    .with_message(format!("{}", e))
+                    .with_text(format!("{}", e))
+                    .with_hint("choose a date that exists")
                     .register(errs);
                 continue 'pairs;
             }
