@@ -208,13 +208,13 @@ fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, R
                 );
             }
             Rule::entry_type => {
-                set_or_fail!(errs, cat, validate_cat(path, errs, subrule!(sub))?, "type", loc);
+                set_or_fail!(errs, cat, read_cat(subrule!(sub)), "type", loc);
             }
             Rule::entry_span => {
-                set_or_fail!(errs, span, validate_span(path, errs, subrule!(sub))?, "span", loc);
+                set_or_fail!(errs, span, read_span(subrule!(sub)), "span", loc);
             }
             Rule::template_tag => {
-                set_or_fail!(errs, tag, validate_template_tag(path, errs, subrule!(sub))?, "tag", loc);
+                set_or_fail!(errs, tag, read_template_tag(subrule!(sub)), "tag", loc);
             }
             _ => unreachable!(),
         }
@@ -307,9 +307,9 @@ fn read_template_amount<'i>(pair: Pair<'i, Rule>) -> AmountTemplate<'i> {
     AmountTemplate { sign, sum }
 }
 
-fn validate_cat<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Category> {
+fn read_cat<'i>(pair: Pair<'i, Rule>) -> Category {
     use entry::Category::*;
-    Some(match pair.as_str() {
+    match pair.as_str() {
         "Pay" => Salary,
         "Food" => Food,
         "Com" => Communication,
@@ -318,10 +318,10 @@ fn validate_cat<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>)
         "Clean" => Cleaning,
         "Home" => Home,
         _ => unreachable!(),
-    })
+    }
 }
 
-fn validate_span<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Span> {
+fn read_span<'i>(pair: Pair<'i, Rule>) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
     let duration = match pair.next().unwrap().as_str() {
@@ -353,14 +353,14 @@ fn validate_span<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>
         pair.next();
     }
     let count = pair.next().map(|it| parse_usize!(it)).unwrap_or(1);
-    Some(Span {
+    Span {
         duration,
         window: window.unwrap_or(Current),
         count,
-    })
+    }
 }
 
-fn validate_template_tag<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<TagTemplate<'i>> {
+fn read_template_tag<'i>(pair: Pair<'i, Rule>) -> TagTemplate<'i> {
     let concat = match pair.as_rule() {
         Rule::builtin_concat => subrule!(pair)
             .into_inner()
@@ -387,7 +387,7 @@ fn validate_template_tag<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'
             _ => unreachable!(),
         });
     }
-    Some(TagTemplate(strs))
+    TagTemplate(strs)
 }
 
 fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: Vec<Pair<'i, Rule>>) -> Option<Vec<AstItem<'i>>> {
@@ -443,10 +443,7 @@ fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Ve
         let loc = (path, entry.as_span().clone());
         match entry.as_rule() {
             Rule::expand_entry => {
-                let res = match validate_expand_entry(path, errs, entry) {
-                    Some(x) => x,
-                    None => continue 'pairs,
-                };
+                let res = read_expand_entry(entry);
                 v.push(AstItem::Instance(date.clone(), loc, res));
             }
             Rule::plain_entry => {
@@ -462,7 +459,7 @@ fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Ve
     Some(v)
 }
 
-fn validate_expand_entry<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pair<'i, Rule>) -> Option<Instance<'i>> {
+fn read_expand_entry<'i>(pairs: Pair<'i, Rule>) -> Instance<'i> {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
     let mut pos = Vec::new();
@@ -470,28 +467,28 @@ fn validate_expand_entry<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pair<
     for arg in args.into_inner() {
         match arg.as_rule() {
             Rule::positional_arg => {
-                pos.push(validate_value(path, errs, subrule!(arg)).unwrap());
+                pos.push(read_value(subrule!(arg)));
             }
             Rule::named_arg => {
                 let (name, value) = pair!(arg);
                 let name = name.as_str();
-                let value = validate_value(path, errs, subrule!(value)).unwrap();
+                let value = read_value(subrule!(value));
                 named.push((name, value));
             }
             _ => unreachable!(),
         }
     }
-    Some(Instance { label, pos, named })
+    Instance { label, pos, named }
 }
 
-fn validate_value<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<Arg<'i>> {
-    Some(match pair.as_rule() {
+fn read_value<'i>(pair: Pair<'i, Rule>) -> Arg<'i> {
+    match pair.as_rule() {
         Rule::money_amount => Arg::Amount(read_amount(pair)),
         Rule::tag_text => Arg::Tag(subrule!(pair).as_str()),
         _ => {
             unreachable!()
         }
-    })
+    }
 }
 
 fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair<'_, Rule>) -> Option<Entry> {
@@ -506,10 +503,10 @@ fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair<'_, Rule>
                 set_or_fail!(errs, value, Amount(parse_amount!(subrule!(item))), "val", loc);
             }
             Rule::entry_type => {
-                set_or_fail!(errs, cat, validate_cat(path, errs, subrule!(item))?, "cat", loc);
+                set_or_fail!(errs, cat, read_cat(subrule!(item)), "cat", loc);
             }
             Rule::entry_span => {
-                set_or_fail!(errs, span, validate_span(path, errs, subrule!(item))?, "span", loc);
+                set_or_fail!(errs, span, read_span(subrule!(item)), "span", loc);
             }
             Rule::entry_tag => {
                 set_or_fail!(
