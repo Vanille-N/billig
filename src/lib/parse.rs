@@ -386,7 +386,7 @@ fn read_span(pair: Pair) -> Span {
     let count = pair.next().map(|it| parse_usize!(it)).unwrap_or(1);
     Span {
         duration,
-        window: window.unwrap_or(Current),
+        window: window.unwrap_or(Posterior),
         count,
     }
 }

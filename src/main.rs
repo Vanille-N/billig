@@ -1,7 +1,7 @@
 mod lib;
 
 fn main() {
-    let filename = std::env::args().nth(1).unwrap_or_else(|| "data.bil".to_string());
+    let filename = std::env::args().nth(1).unwrap_or_else(|| "../expenses.bil".to_string());
 
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);

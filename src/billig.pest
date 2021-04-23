@@ -91,7 +91,7 @@ entries_year = { marker_year ~ colon ~ entries_month+ }
 /////////////////////////////
 // -- Template Definition --
 
-template_time = @{ "@Day" | "@Month" | "@Year" | "@Date" | "@Weekday" }
+template_time = { "@Day" | "@Month" | "@Year" | "@Date" | "@Weekday" }
 template_arg_expand = _{ "*" ~ identifier }
 template_value = _{ money_amount | template_arg_expand }
 template_string = _{ tag_text | template_arg_expand | template_time }
@@ -99,7 +99,7 @@ template_value_args = { ( whitespace ~ template_value )* }
 template_string_args = { ( whitespace ~ template_string )* }
 
 // e.g.:
-// @Sum *value &10 *supplement
+// @Sum *value 10 *supplement
 builtin_sum = { "@Sum" ~ template_value_args }
 // e.g.: @Neg *value
 builtin_neg = {
