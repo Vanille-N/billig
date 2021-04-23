@@ -1,3 +1,12 @@
+//! Day-precise time management, with a focus on edge cases
+//!
+//! Dates are `YYYY-Mmm-DD`, not number of seconds, and provide an interface
+//! for dealing with durations that are expressed in number of days, weeks, months
+//! or years.
+//!
+//! They also support weekday calculations, and jumping to the boundaries of
+//! a time frame (see for example `start_of_week` or `end_of_month`)
+
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::fmt;
@@ -6,6 +15,8 @@ use std::fmt;
 ///
 /// Supports years in the range 1000..=9999, but weekday conversion
 /// is not guaranteed accurate before 1900.
+///
+/// All methods execute in constant time
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
     year: u16,
@@ -19,6 +30,7 @@ impl fmt::Display for Date {
     }
 }
 
+/// Twelve months in the year, identified by their 3-letter abbreviations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, PartialOrd, Ord)]
 pub enum Month {
     Jan = 0,
@@ -170,8 +182,6 @@ impl Date {
     /// for any date `d`,
     ///
     ///     assert_eq!(d.index() + 1, d.next().index());
-    ///
-    /// Executes in constant time
     pub fn index(self) -> usize {
         let leaps = {
             let years = if self.month <= Month::Feb {
@@ -192,8 +202,6 @@ impl Date {
     }
 
     /// Get day of week
-    ///
-    /// Executes in constant time
     pub fn weekday(self) -> Weekday {
         let offset = 2; // essentially the weekday of 0000-Jan-01
         Weekday::from_usize((self.index() - offset) % 7).unwrap()
@@ -293,9 +301,9 @@ impl Date {
         }
     }
 
-    /// `count` months before/after current date
+    /// `count` years before/after current date
     ///
-    /// Day will be truncated if needed:
+    /// Day will be truncated in the rare case it is needed:
     /// adding one year to `2000-Feb-29` makes it `2001-Feb-28`
     pub fn jump_year(self, count: isize) -> Self {
         let year = (self.year as isize + count) as u16;
