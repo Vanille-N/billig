@@ -281,7 +281,8 @@ impl Date {
     }    
 }
 
-fn is_bissextile(year: usize) -> bool {
+
+fn is_bissextile(year: u16) -> bool {
     if year % 400 == 0 {
         true
     } else if year % 100 == 0 {
@@ -295,14 +296,28 @@ impl fmt::Display for DateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use DateError::*;
         match self {
-            UnsupportedYear(y) => writeln!(f, "{} is outside of the supported range for years", y),
-            NotBissextile(y) => writeln!(f, "{} is not bissextile, so Feb 29 does not exist", y),
-            MonthTooShort(y, m, d) => writeln!(
+            UnsupportedYear(y) => write!(f, "{} is outside of the supported range for years", y),
+            NotBissextile(y) => write!(f, "{} is not bissextile, Feb 29 does not exist", y),
+            MonthTooShort(m, d) => write!(
                 f,
-                "In {}: {:?} is a short month, it does not have a {}th day",
-                y, m, d,
+                "{} is a short month, it does not have a {}th day",
+                m, d,
             ),
-            InvalidDay(y, m, d) => writeln!(f, "In {} {:?}: {} is not a valid day", y, m, d),
+            InvalidDay(d) => write!(f, "{} is not a valid day", d),
+        }
+    }
+}
+
+impl DateError {
+    pub fn fix_hint(self) -> String {
+        use DateError::*;
+        match self {
+            UnsupportedYear(_) => "year should be between 2000 and 4000 inclusive".to_string(),
+            NotBissextile(y) => format!("did you mean {y}-Feb-28 or {y}-Mar-01 ?", y = y),
+            MonthTooShort(m, d) => format!("{} is only {} days long", m,
+                if m == Month::Feb { 28.max(d - 1) } else { 30 }
+            ),
+            InvalidDay(d) => format!("{} is not in the range 1 ..= 31", d),
         }
     }
 }
@@ -312,6 +327,7 @@ mod test {
     use super::{
         *,
         Month::*,
+        Weekday::*,
     };
 
     #[test]
@@ -337,7 +353,7 @@ mod test {
     }
     macro_rules! short {
         ( $y:tt - $m:tt - $d:tt ) => {
-            assert_eq!(Date::from($y, $m, $d), Err(DateError::MonthTooShort($y, $m, $d)));
+            assert_eq!(Date::from($y, $m, $d), Err(DateError::MonthTooShort($m, $d)));
         }
     }
     macro_rules! nbiss {
@@ -347,7 +363,7 @@ mod test {
     }
     macro_rules! invalid {
         ( $y:tt - $m:tt - $d:tt ) => {
-            assert_eq!(Date::from($y, $m, $d), Err(DateError::InvalidDay($y, $m, $d)));
+            assert_eq!(Date::from($y, $m, $d), Err(DateError::InvalidDay($d)));
         }
     }
     
@@ -385,5 +401,176 @@ mod test {
         short!(2021-Feb-30);
         nbiss!(2021-Feb-29);
         ok!(2021-Feb-28);
+    }
+
+    macro_rules! dt {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            Date::from($y, $m, $d).unwrap()
+        }
+    }
+    
+    macro_rules! day {
+        ( $d:expr => $w:expr ) => {
+            assert_eq!($d.weekday(), $w)
+        }
+    }
+    #[test]
+    fn weekday_references() {
+        // accross a week
+        day!(dt!(2000-Jan-1) => Sat);
+        day!(dt!(2000-Jan-2) => Sun);
+        day!(dt!(2000-Jan-3) => Mon);
+        day!(dt!(2000-Jan-4) => Tue);
+        day!(dt!(2000-Jan-5) => Wed);
+        day!(dt!(2000-Jan-6) => Thu);
+        day!(dt!(2000-Jan-7) => Fri);
+        day!(dt!(2000-Jan-8) => Sat);
+        // accross months
+        day!(dt!(2000-Feb-1) => Tue);
+        day!(dt!(2000-Mar-1) => Wed);
+        day!(dt!(2000-Apr-1) => Sat);
+        day!(dt!(2000-May-1) => Mon);
+        day!(dt!(2000-Jun-1) => Thu);
+        day!(dt!(2000-Jul-1) => Sat);
+        day!(dt!(2000-Aug-1) => Tue);
+        day!(dt!(2000-Sep-1) => Fri);
+        day!(dt!(2000-Oct-1) => Sun);
+        day!(dt!(2000-Nov-1) => Wed);
+        day!(dt!(2000-Dec-1) => Fri);
+        // accross years
+        day!(dt!(2000-Dec-31) => Sun);
+        day!(dt!(2001-Dec-31) => Mon);
+        day!(dt!(2002-Dec-31) => Tue);
+        day!(dt!(2003-Dec-31) => Wed);
+        day!(dt!(2004-Dec-31) => Fri);
+        day!(dt!(2005-Dec-31) => Sat);
+        day!(dt!(2006-Dec-31) => Sun);
+        day!(dt!(2007-Dec-31) => Mon);
+        day!(dt!(2008-Dec-31) => Wed);
+        day!(dt!(2009-Dec-31) => Thu);
+        day!(dt!(2010-Dec-31) => Fri);
+        // accross centuries
+        day!(dt!(2000-Jul-14) => Fri);
+        day!(dt!(2100-Jul-14) => Wed);
+        day!(dt!(2200-Jul-14) => Mon);
+        day!(dt!(2300-Jul-14) => Sat);
+        day!(dt!(2400-Jul-14) => Fri);
+        day!(dt!(2500-Jul-14) => Wed);
+    }
+
+    #[test]
+    fn weekday_consistent() {
+        let mut d = Date::from(2000, Jan, 1).unwrap();
+        let end = Date::from(3000, Dec, 31).unwrap();
+        while d < end {
+            let ds = d.next();
+            let w = d.weekday().next();
+            let ws = ds.weekday();
+            if w != ws {
+                panic!("date {}, successor {}, expected {} == {}", d, ds, w, ws);
+            }
+            d = ds;
+        }
+    }
+
+    #[test]
+    fn index_consistent() {
+        let mut d = Date::from(2000, Jan, 1).unwrap();
+        let end = Date::from(3000, Dec, 31).unwrap();
+        while d < end {
+            let ds = d.next();
+            let n = d.index() + 1;
+            let ns = ds.index();
+            if n != ns {
+                panic!("date {}, successor {}, expected {} == {}", d, ds, n, ns);
+            }
+            d = ds;
+        }
+    }
+
+    macro_rules! jday {
+        ( $d1:expr, $d2:expr ) => {{
+            assert_eq!($d1.jump_day(1), $d2);
+            assert_eq!($d2.jump_day(-1), $d1);
+        }}
+    }
+    macro_rules! jmonth {
+        ( $d1:expr, $n:expr, <->, $d2:expr ) => {{
+            assert_eq!($d1.jump_month($n), $d2);
+            assert_eq!($d2.jump_month(-$n), $d1);
+        }};
+        ( $d1:expr, $n:expr, ->, $d2:expr ) => {{
+            assert_eq!($d1.jump_month($n), $d2);
+        }};
+        ( $d1:expr, $n:expr, <-, $d2:expr ) => {{
+            assert_eq!($d2.jump_month(-$n), $d1);
+        }};
+
+    }
+    macro_rules! jyear {
+        ( $d1:expr, $n:expr, <->, $d2:expr ) => {{
+            assert_eq!($d1.jump_year($n), $d2);
+            assert_eq!($d2.jump_year(-$n), $d1);
+        }};
+        ( $d1:expr, $n:expr, ->, $d2:expr ) => {{
+            assert_eq!($d1.jump_year($n), $d2);
+        }};
+        ( $d1:expr, $n:expr, <-, $d2:expr ) => {{
+            assert_eq!($d2.jump_year(-$n), $d1);
+        }};
+    }
+
+    #[test]
+    fn jump_day() {
+        jday!(dt!(2020-Jan-1), dt!(2020-Jan-2));
+        jday!(dt!(2020-Jan-15), dt!(2020-Jan-16));
+        jday!(dt!(2020-Jan-30), dt!(2020-Jan-31));
+        jday!(dt!(2020-Jan-31), dt!(2020-Feb-1));
+        jday!(dt!(2020-Feb-28), dt!(2020-Feb-29));
+        jday!(dt!(2021-Feb-28), dt!(2021-Mar-1));
+        jday!(dt!(2020-Apr-30), dt!(2020-May-1));
+        jday!(dt!(2020-Dec-30), dt!(2020-Dec-31));
+        jday!(dt!(2020-Dec-31), dt!(2021-Jan-1));
+    }
+
+    #[test]
+    fn big_jump_day() {
+        assert_eq!(dt!(2000-Jan-1).jump_day(365242), dt!(2999-Dec-31));
+    }
+
+    #[test]
+    fn jump_month() {
+        jmonth!(dt!(2020-Jan-1), 2, <->, dt!(2020-Mar-1));
+        jmonth!(dt!(2020-Dec-1), 1, <->, dt!(2021-Jan-1));
+        jmonth!(dt!(2020-Dec-30), 1, <->, dt!(2021-Jan-30));
+        jmonth!(dt!(2020-Mar-31), 1, ->, dt!(2020-Apr-30));
+        jmonth!(dt!(2019-Dec-31), 2, ->, dt!(2020-Feb-29));
+        jmonth!(dt!(2021-Jan-31), 1, ->, dt!(2021-Feb-28));
+        jmonth!(dt!(2021-Feb-1), 1, <-, dt!(2021-Mar-1));
+        jmonth!(dt!(2021-Feb-28), 1, <-, dt!(2021-Mar-28));
+        jmonth!(dt!(2020-Jan-15), 25, <->, dt!(2022-Feb-15));
+    }
+
+    #[test]
+    fn jump_year() {
+        jyear!(dt!(2020-Jan-1), 1, <->, dt!(2021-Jan-1));
+        jyear!(dt!(2020-Feb-28), 5, <->, dt!(2025-Feb-28));
+        jyear!(dt!(2020-Feb-29), 5, ->, dt!(2025-Feb-28));
+        jyear!(dt!(2019-Feb-28), 1, <-, dt!(2020-Feb-29));
+    }
+
+    #[test]
+    fn time_boundaries() {
+        assert_eq!(dt!(2020-Mar-26).start_of_month(), dt!(2020-Mar-1));
+        assert_eq!(dt!(2020-Feb-12).end_of_month(), dt!(2020-Feb-29));
+        assert_eq!(dt!(2020-Dec-31).start_of_year(), dt!(2020-Jan-1));
+        assert_eq!(dt!(2020-Dec-5).end_of_year(), dt!(2020-Dec-31));
+        for i in 1..15 {
+            day!(dt!(2020-Jan-i).start_of_week() => Mon);
+            day!(dt!(2020-Jan-i).end_of_week() => Sun);
+        }
+        day!(dt!(2000-Jan-5) => Wed);
+        assert_eq!(dt!(2000-Jan-5).start_of_week(), dt!(2000-Jan-3));
+        assert_eq!(dt!(2000-Jan-5).end_of_week(), dt!(2000-Jan-9));
     }
 }
