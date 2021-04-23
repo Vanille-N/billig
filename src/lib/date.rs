@@ -158,7 +158,127 @@ impl Date {
         Weekday::from_usize((self.index() - offset) % 7).unwrap()
     }
 
+    pub fn next(self) -> Self {
+        if self.month.count(self.year) == self.day {
+            if self.month == Month::Dec {
+                Self { year: self.year + 1, month: Month::Jan, day: 1 }
+            } else {
+                Self { month: self.month.next(), day: 1, ..self }
+            }
+        } else {
+            Self { day: self.day + 1, ..self }
+        }
     }
+
+    pub fn prev(self) -> Self {
+        if self.day == 1 {
+            if self.month == Month::Jan {
+                Self { year: self.year - 1, month: Month::Dec, day: 31 }
+            } else {
+                let month = self.month.prev();
+                Self { month, day: month.count(self.year), ..self }
+            }
+        } else {
+            Self { day: self.day - 1, ..self }
+        }
+    }
+
+
+    pub fn jump_day(self, count: isize) -> Self {
+        let full_count = count;
+        // first rough approximation to get
+        // the year and month as close as possible
+        let (d, count) = if count > 30 {
+            let target = self.index() as isize + count;
+            let adjust_year = self.jump_year(count / 365);
+            let adjust_month = adjust_year.jump_month((target - adjust_year.index() as isize) / 31);
+            #[cfg(test)]
+            println!("{} -> {} -> {}", self, adjust_year, adjust_month);
+            (adjust_month, target - adjust_month.index() as isize)
+        } else {
+            (self, count)
+        };
+        let mut d = d;
+        if count > 0 {
+            let mut count = count as u8;
+            while count > 0 {
+                let diff = (d.month.count(d.year) - d.day).min(count);
+                d.day += diff;
+                count -= diff;
+                if count > 0 {
+                    d = d.next();
+                    count -= 1;
+                }
+            }
+        } else {
+            let mut count = (-count) as u8;
+            while count > 0 {
+                let diff = (d.day - 1).min(count);
+                d.day -= diff;
+                count -= diff;
+                if count > 0 {
+                    d = d.prev();
+                    count -= 1;
+                }
+            }
+        }
+        assert_eq!(d.index() as isize, self.index() as isize + full_count);
+        d
+    }
+
+    pub fn jump_month(self, count: isize) -> Self {
+        let (year, month) = {
+            let mut year = self.year as isize;
+            let mut month = self.month as isize + count;
+            while month < 0 {
+                month += 12;
+                year -= 1;
+            }
+            while month >= 12 {
+                month -= 12;
+                year += 1;
+            }
+            (year as u16, Month::from_isize(month).unwrap())
+        };
+        Self {
+            year,
+            month,
+            day: self.day.min(month.count(year)),
+        }
+    }
+
+    pub fn jump_year(self, count: isize) -> Self {
+        let year = (self.year as isize + count) as u16;
+        if self.month == Month::Feb && self.day == 29 && !is_bissextile(year) {
+            Self { year, day: 28, ..self }
+        } else {
+            Self { year, ..self }
+        }
+    }
+
+    pub fn start_of_month(self) -> Self {
+        Self { day: 1, ..self }
+    }
+
+    pub fn end_of_month(self) -> Self {
+        Self { day: self.month.count(self.year), ..self }
+    }
+
+    pub fn start_of_year(self) -> Self {
+        Self { day: 1, month: Month::Jan, ..self }
+    }
+
+    pub fn end_of_year(self) -> Self {
+        Self { day: 31, month: Month::Dec, ..self }
+    }
+    
+    pub fn start_of_week(self) -> Self {
+        self.jump_day(-(self.weekday() as isize))
+    }
+
+    pub fn end_of_week(self) -> Self {
+        self.jump_day(6 - self.weekday() as isize)
+    }    
 }
 
 fn is_bissextile(year: usize) -> bool {
