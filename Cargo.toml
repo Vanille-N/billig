@@ -3,8 +3,13 @@ name = "billig"
 version = "0.0.1"
 authors = ["Vanille-N <neven.villani@gmail.com>"]
 edition = "2018"
+description = "A command-line DSL budget manager"
+repository = "https://github.com/Vanille-N/billig/"
+license = "MIT OR Apache-2.0"
+keywords = ["budget", "money"]
+categories = ["command-line-utilities", "date-and-time", "visualization"]
+exclude = ["book", "examples", "aux"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 pest = "2.1"
