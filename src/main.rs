@@ -5,6 +5,7 @@ fn main() {
 
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);
+    println!("{:?}", entries);
 
 }
 

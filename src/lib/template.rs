@@ -95,7 +95,7 @@ fn instanciate_item(
         None => {
             Error::new("Undeclared template")
                 .with_span(loc, format!("attempt to instanciate {}", instance.label))
-                .with_text(format!("{} is not declared", instance.label))
+                .with_text(format!("'{}' is not declared", instance.label))
                 .with_hint("Maybe a typo ?")
                 .register(errs);
             return None;

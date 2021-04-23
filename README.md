@@ -41,7 +41,7 @@ The following example gives an overview of the available constructs.
             // of Day<Curr> 1
 
 // this is a template
-!food-supplies value { // it takes a single positional argument
+!food_supplies value { // it takes a single positional argument
     val @Neg *value, // expands to an amount
     type Food,
     span Month<Post>,
@@ -60,7 +60,7 @@ The following example gives an overview of the available constructs.
 
 2020:
     Dec:
-        15: !food-supplies 69.42;
+        15: !food_supplies 69.42;
             // expands to:
             //   val -69.42, type Food, span Month<Post>,
             //   tag "Food 2020-Dec";

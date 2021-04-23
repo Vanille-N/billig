@@ -1,4 +1,4 @@
-!self-sufficient unused extra="" {
+!self_sufficient unused extra="" {
     val 0,
     type Food,
     span Day,
@@ -7,4 +7,4 @@
 
 2020:
     Sep:
-        01: !self-sufficient 0 other="";
+        01: !self_sufficient 0 other="";
