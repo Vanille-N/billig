@@ -8,7 +8,7 @@ if exists("b:current_syntax")
 endif
 
 syn keyword bilKeyword val type span tag
-syn keyword bilCategory Food Clean Home Pay Pro Com Mov
+syn keyword bilCategory Food Clean Home Pay Pro Tech Mov
 syn keyword bilWindow Post Curr Ante Pred Succ
 syn keyword bilDuration Day Week Month Year
 

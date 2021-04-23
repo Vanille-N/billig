@@ -23,7 +23,7 @@ tag_text = _{ "\"" ~ string ~ "\"" }
 // e.g.: abc_X 
 identifier = @{ ( 'a'..'z' | 'A'..'Z' | "_" )+ }
 
-expense_type = { "Pay" | "Food" | "Com" | "Mov" | "Pro" | "Clean" | "Home" }
+expense_type = { "Pay" | "Food" | "Tech" | "Mov" | "Pro" | "Clean" | "Home" }
 span_duration = { "Day" | "Week" | "Month" | "Year" }
 span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
 

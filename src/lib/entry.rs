@@ -43,7 +43,7 @@ pub enum Category {
     Food,
     Home,
     Salary,
-    Communication,
+    Tech,
     Movement,
     Cleaning,
 }
