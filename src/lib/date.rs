@@ -103,52 +103,22 @@ impl fmt::Display for Weekday {
 pub enum DateError {
     UnsupportedYear(usize),
     NotBissextile(usize),
-    MonthTooShort(usize, Month, usize),
-    InvalidDay(usize, Month, usize),
+    MonthTooShort(Month, usize),
+    InvalidDay(usize),
 }
 
 impl Date {
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
-        use Month::*;
         if !(2000..=4000).contains(&year) {
             Err(DateError::UnsupportedYear(year))
-        } else if day > 31 || day == 0 {
-            Err(DateError::InvalidDay(year, month, day))
-        } else if day == 31 {
-            match month {
-                Jan | Mar | May | Jul | Aug | Oct | Dec => Ok(Self {
-                    year: year as u16,
-                    month,
-                    day: day as u8,
-                }),
-                _ => Err(DateError::MonthTooShort(year, month, day)),
-            }
-        } else if day == 30 {
-            if month == Feb {
-                Err(DateError::MonthTooShort(year, month, day))
-            } else {
-                Ok(Self {
-                    year: year as u16,
-                    month,
-                    day: day as u8,
-                })
-            }
-        } else if day == 29 {
-            if month == Feb && !is_bissextile(year) {
-                Err(DateError::NotBissextile(year))
-            } else {
-                Ok(Self {
-                    year: year as u16,
-                    month,
-                    day: day as u8,
-                })
-            }
+        } else if day == 0 || day > 31 {
+            Err(DateError::InvalidDay(day))
+        } else if day <= month.count(year as u16) as usize {
+            Ok(Self { year: year as u16, month, day: day as u8 })
+        } else if day >= 30 {
+            Err(DateError::MonthTooShort(month, day))
         } else {
-            Ok(Self {
-                year: year as u16,
-                month,
-                day: day as u8,
-            })
+            Err(DateError::NotBissextile(year))
         }
     }
 
@@ -164,15 +134,30 @@ impl Date {
         self.year
     }
 
-    pub fn weekday(&self) -> Weekday {
-        Weekday::Mon
-        // TODO
+    pub fn index(self) -> usize {
+        let leaps = {
+            let years = if self.month <= Month::Feb {
+                self.year as usize - 1
+            } else {
+                self.year as usize
+            };
+            // count leap years before current
+            (years / 4) - (years / 100) + (years / 400) 
+        };
+        let mut n = self.year as usize * 365 + self.day as usize;
+        // partially elapsed current year
+        for m in 0..self.month as usize {
+            n += [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m];
+        }
+        n += leaps; // each leap year adds one day
+        n
     }
-}
 
-impl fmt::Display for Date {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{}-{:02}", self.year, self.month, self.day)
+    pub fn weekday(self) -> Weekday {
+        let offset = 2; // essentially the weekday of 0000-Jan-01
+        Weekday::from_usize((self.index() - offset) % 7).unwrap()
+    }
+
     }
 }
 
