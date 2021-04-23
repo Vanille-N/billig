@@ -2,6 +2,10 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::fmt;
 
+/// A date with day-precision
+///
+/// Supports years in the range 1000..=9999, but weekday conversion
+/// is not guaranteed accurate before 1900.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
     year: u16,
@@ -32,6 +36,14 @@ pub enum Month {
 }
 
 impl Month {
+    /// Parse a month from its stringified name (`"Jan"`, `"Feb"`, `"Mar"`, ...)
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the string is not a valid 3-character month name.
+    ///
+    /// It is meant to translate text matched by the grammar, not validate arbitrary
+    /// user input.
     pub fn from(s: &str) -> Self {
         use Month::*;
         match s {
@@ -51,18 +63,23 @@ impl Month {
         }
     }
 
+    /// Month directly succeeding the current one with wrapping
     pub fn next(self) -> Self {
         Self::from_isize((self as isize + 1) % 12).unwrap()
     }
+
+    /// Month directly preceding the current one with wrapping
     pub fn prev(self) -> Self {
         Self::from_isize((self as isize + 11) % 12).unwrap()
     }
+
+    /// Number of days in this month of the given year
     pub fn count(self, year: u16) -> u8 {
         use Month::*;
         match self {
             Jan | Mar | May | Jul | Aug | Oct | Dec => 31,
             Apr | Jun | Sep | Nov => 30,
-            Feb => if is_bissextile(year) { 29 } else { 28 },
+            Feb => if is_leap(year) { 29 } else { 28 },
         }
     }
 }
@@ -73,6 +90,7 @@ impl fmt::Display for Month {
     }
 }
 
+/// Weekday with Monday-first week convention
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, FromPrimitive)]
 pub enum Weekday {
     Mon = 0,
@@ -85,9 +103,12 @@ pub enum Weekday {
 }
 
 impl Weekday {
+    /// Weekday directly succeeding the current one with wrapping
     pub fn next(self) -> Self {
         Self::from_isize((self as isize + 1) % 7).unwrap()
     }
+
+    /// Weekday directly preceding the current one with wrapping
     pub fn prev(self) -> Self {
         Self::from_isize((self as isize + 6) % 7).unwrap()
     }
@@ -99,17 +120,23 @@ impl fmt::Display for Weekday {
     }
 }
 
+/// Ways in which a date taken from user input can be wrong
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DateError {
+    /// year is outside of 1000..=9999
     UnsupportedYear(usize),
+    /// Feb 29 of a non-leap year
     NotBissextile(usize),
+    /// Feb 30 or Feb 31 or 31st day of a 30-day month
     MonthTooShort(Month, usize),
+    /// day outside of 1..=31
     InvalidDay(usize),
 }
 
 impl Date {
+    /// Validate year-month-day into date
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
-        if !(2000..=4000).contains(&year) {
+        if !(1000..=9999).contains(&year) {
             Err(DateError::UnsupportedYear(year))
         } else if day == 0 || day > 31 {
             Err(DateError::InvalidDay(day))
@@ -122,18 +149,29 @@ impl Date {
         }
     }
 
+    /// `self.day` accessor
     pub fn day(&self) -> u8 {
         self.day
     }
 
+    /// `self.month` accessor
     pub fn month(&self) -> Month {
         self.month
     }
 
+    /// `self.year` accessor
     pub fn year(&self) -> u16 {
         self.year
     }
 
+    /// Biject the dates with integers
+    ///
+    /// This indexing is guaranteed consistent in the sense that
+    /// for any date `d`,
+    ///
+    ///     assert_eq!(d.index() + 1, d.next().index());
+    ///
+    /// Executes in constant time
     pub fn index(self) -> usize {
         let leaps = {
             let years = if self.month <= Month::Feb {
@@ -153,6 +191,9 @@ impl Date {
         n
     }
 
+    /// Get day of week
+    ///
+    /// Executes in constant time
     pub fn weekday(self) -> Weekday {
         let offset = 2; // essentially the weekday of 0000-Jan-01
         Weekday::from_usize((self.index() - offset) % 7).unwrap()
@@ -184,6 +225,7 @@ impl Date {
     }
 
 
+    /// `count` days before/after current date
     pub fn jump_day(self, count: isize) -> Self {
         let full_count = count;
         // first rough approximation to get
@@ -226,6 +268,10 @@ impl Date {
         d
     }
 
+    /// `count` months before/after current date
+    ///
+    /// Day will be truncated to fit in the new month:
+    /// adding one month to `2000-Jan-31` makes it `2000-Feb-29`
     pub fn jump_month(self, count: isize) -> Self {
         let (year, month) = {
             let mut year = self.year as isize;
@@ -247,42 +293,52 @@ impl Date {
         }
     }
 
+    /// `count` months before/after current date
+    ///
+    /// Day will be truncated if needed:
+    /// adding one year to `2000-Feb-29` makes it `2001-Feb-28`
     pub fn jump_year(self, count: isize) -> Self {
         let year = (self.year as isize + count) as u16;
-        if self.month == Month::Feb && self.day == 29 && !is_bissextile(year) {
+        if self.month == Month::Feb && self.day == 29 && !is_leap(year) {
             Self { year, day: 28, ..self }
         } else {
             Self { year, ..self }
         }
     }
 
+    /// Get date of the first day of the current month
     pub fn start_of_month(self) -> Self {
         Self { day: 1, ..self }
     }
-
+    
+    /// Get date of the last day of the current month
     pub fn end_of_month(self) -> Self {
         Self { day: self.month.count(self.year), ..self }
     }
 
+    /// Jan 1st of the current year
     pub fn start_of_year(self) -> Self {
         Self { day: 1, month: Month::Jan, ..self }
     }
 
+    /// Dec 31st of the current year
     pub fn end_of_year(self) -> Self {
         Self { day: 31, month: Month::Dec, ..self }
     }
     
+    /// First Monday before the current date
     pub fn start_of_week(self) -> Self {
         self.jump_day(-(self.weekday() as isize))
     }
-
+    
+    /// First Sunday after the current date
     pub fn end_of_week(self) -> Self {
         self.jump_day(6 - self.weekday() as isize)
     }    
 }
 
 
-fn is_bissextile(year: u16) -> bool {
+fn is_leap(year: u16) -> bool {
     if year % 400 == 0 {
         true
     } else if year % 100 == 0 {
@@ -309,10 +365,11 @@ impl fmt::Display for DateError {
 }
 
 impl DateError {
+    /// What message to show to help fix the date error
     pub fn fix_hint(self) -> String {
         use DateError::*;
         match self {
-            UnsupportedYear(_) => "year should be between 2000 and 4000 inclusive".to_string(),
+            UnsupportedYear(_) => "year should be between 1000 and 9999 inclusive".to_string(),
             NotBissextile(y) => format!("did you mean {y}-Feb-28 or {y}-Mar-01 ?", y = y),
             MonthTooShort(m, d) => format!("{} is only {} days long", m,
                 if m == Month::Feb { 28.max(d - 1) } else { 30 }
@@ -333,10 +390,10 @@ mod test {
     #[test]
     fn bissextile_check() {
         macro_rules! yes {
-            ( $y:expr ) => { assert!(is_bissextile($y)); }
+            ( $y:expr ) => { assert!(is_leap($y)); }
         }
         macro_rules! no {
-            ( $y:expr ) => { assert!(!is_bissextile($y)); }
+            ( $y:expr ) => { assert!(!is_leap($y)); }
         }
         yes!(2004);
         no!(2100);
