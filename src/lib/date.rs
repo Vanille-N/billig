@@ -1,15 +1,23 @@
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 use std::fmt;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Date {
     year: u16,
     month: Month,
     day: u8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl fmt::Display for Date {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-{}-{:02}", self.year, self.month, self.day)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive, PartialOrd, Ord)]
 pub enum Month {
-    Jan,
+    Jan = 0,
     Feb,
     Mar,
     Apr,
@@ -42,6 +50,21 @@ impl Month {
             _ => unreachable!(),
         }
     }
+
+    pub fn next(self) -> Self {
+        Self::from_isize((self as isize + 1) % 12).unwrap()
+    }
+    pub fn prev(self) -> Self {
+        Self::from_isize((self as isize + 11) % 12).unwrap()
+    }
+    pub fn count(self, year: u16) -> u8 {
+        use Month::*;
+        match self {
+            Jan | Mar | May | Jul | Aug | Oct | Dec => 31,
+            Apr | Jun | Sep | Nov => 30,
+            Feb => if is_bissextile(year) { 29 } else { 28 },
+        }
+    }
 }
 
 impl fmt::Display for Month {
@@ -50,15 +73,24 @@ impl fmt::Display for Month {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, FromPrimitive)]
 pub enum Weekday {
-    Mon,
+    Mon = 0,
     Tue,
     Wed,
     Thu,
     Fri,
     Sat,
     Sun,
+}
+
+impl Weekday {
+    pub fn next(self) -> Self {
+        Self::from_isize((self as isize + 1) % 7).unwrap()
+    }
+    pub fn prev(self) -> Self {
+        Self::from_isize((self as isize + 6) % 7).unwrap()
+    }
 }
 
 impl fmt::Display for Weekday {
