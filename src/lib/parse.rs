@@ -1,38 +1,50 @@
+//! Convert a reference to a file into a stream of AST items
+//! (entries and templates)
+
 #![allow(clippy::upper_case_acronyms)]
 
+use pest::Parser;
 use pest_derive::*;
-use pest::{
-    Parser,
-    iterators::{Pair, Pairs},
-};
+type Pair<'i> = pest::iterators::Pair<'i, Rule>;
+type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
 use crate::lib::{
-    entry::{self, Entry, Amount, Tag, Span, Category},
-    template::{self, Arg, Instance, models::*},
     date::{Date, Month},
-    error::{ErrorRecord, Error, Loc}
+    entry::{self, Amount, Category, Entry, Span, Tag},
+    error::{Error, ErrorRecord, Loc},
+    template::{self, models::*, Arg, Instance},
 };
 
+/// Convenient exports
 pub mod ast {
-    pub use super::{
-        Ast,
-        AstItem,
-    };
+    pub use super::{Ast, AstItem};
 }
 
 #[derive(Parser)]
 #[grammar = "billig.pest"]
-pub struct BilligParser;
+struct BilligParser;
 
 pub type Ast<'i> = Vec<AstItem<'i>>;
 
+/// Each item of the file
 #[derive(Debug)]
 pub enum AstItem<'i> {
+    /// an explicit entry with its date
     Entry(Date, Entry),
+    /// a template expansion with its date
     Instance(Date, Loc<'i>, Instance<'i>),
+    /// a template definition
     Template(&'i str, Loc<'i>, Template<'i>),
 }
 
+/// Get the contents of file `path`
+///
+/// The return value may be non-empty even if some errors (including fatal ones) occured.
+/// More specifically, return value is likely (but not guaranteed in the long term) to
+/// contain all items that parsed correctly.
+///
+/// Caller should determine the success of this function not through its return value
+/// but by querying `errs` (e.g. by checking `errs.is_fatal()` or `errs.count_errors()`)
 pub fn extract<'i>(path: &'i str, errs: &mut ErrorRecord, contents: &'i str) -> Ast<'i> {
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
@@ -48,18 +60,6 @@ pub fn extract<'i>(path: &'i str, errs: &mut ErrorRecord, contents: &'i str) -> 
 
 // extract contents of wrapper rule
 macro_rules! subrule {
-    ( $node:expr, $rule:expr ) => {{
-        let node = $node;
-        assert_eq!(node.as_rule(), $rule);
-        let mut items = node.into_inner().into_iter();
-        let fst = items
-            .next()
-            .unwrap_or_else(|| panic!("{:?} has no subrule", $rule));
-        if items.next().is_some() {
-            panic!("{:?} has several subrules", $rule);
-        }
-        fst
-    }};
     ( $node:expr ) => {{
         let mut items = $node.into_inner().into_iter();
         let fst = items.next().unwrap_or_else(|| panic!("No subrule"));
@@ -112,6 +112,7 @@ macro_rules! parse_usize {
 // pair to amount contents
 macro_rules! parse_amount {
     ( $node:expr ) => {
+        // safe to .unwrap() because the grammar validated it already
         ($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize
     };
 }
@@ -138,6 +139,9 @@ macro_rules! unwrap_or_fail {
             Some(v) => v,
             None => {
                 let name = $name;
+                // since $name is known at compile-time, the compiler
+                // will deal with this. It beats having to provide more arguments
+                // to the macro.
                 let hint_value = match name {
                     "tag" => "\"Some information\"",
                     "val" => "42.0",
@@ -148,7 +152,10 @@ macro_rules! unwrap_or_fail {
                 Error::new("Missing field definition")
                     .with_span(&$loc, format!("'{}' may not be omitted", name))
                     .with_text("Each field must be defined once")
-                    .with_hint(format!("add definition for the missing field: '{} {}'", name, hint_value))
+                    .with_hint(format!(
+                        "add definition for the missing field: '{} {}'",
+                        name, hint_value
+                    ))
                     .register($errs);
                 return None;
             }
@@ -156,7 +163,7 @@ macro_rules! unwrap_or_fail {
     }};
 }
 
-pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i, Rule>) -> Ast<'i> {
+pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> Ast<'i> {
     let mut ast = Vec::new();
     'pairs: for pair in pairs {
         let loc = (path, pair.as_span().clone());
@@ -184,7 +191,11 @@ pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i, Rule
     ast
 }
 
-fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, Rule>) -> Option<(&'i str, Template<'i>)> {
+fn validate_template<'i>(
+    path: &'i str,
+    errs: &mut ErrorRecord,
+    pair: Pair<'i>,
+) -> Option<(&'i str, Template<'i>)> {
     let loc = (path, pair.as_span().clone());
     let (id, args, body) = triplet!(pair);
     assert_eq!(id.as_rule(), Rule::identifier);
@@ -199,13 +210,7 @@ fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, R
     for sub in body.into_inner() {
         match sub.as_rule() {
             Rule::template_money_amount => {
-                set_or_fail!(
-                    errs,
-                    value,
-                    read_template_amount(subrule!(sub, Rule::template_money_amount)),
-                    "val",
-                    loc
-                );
+                set_or_fail!(errs, value, read_template_amount(subrule!(sub)), "val", loc);
             }
             Rule::expense_type => {
                 set_or_fail!(errs, cat, read_cat(sub), "type", loc);
@@ -236,7 +241,7 @@ fn validate_template<'i>(path: &'i str, errs: &mut ErrorRecord, pair: Pair<'i, R
     ))
 }
 
-fn read_args(pairs: Pairs<'_, Rule>) -> (Vec<&str>, Vec<(&str, Arg)>) {
+fn read_args(pairs: Pairs) -> (Vec<&str>, Vec<(&str, Arg)>) {
     let mut positional = Vec::new();
     let mut named = Vec::new();
     for pair in pairs {
@@ -248,7 +253,7 @@ fn read_args(pairs: Pairs<'_, Rule>) -> (Vec<&str>, Vec<(&str, Arg)>) {
     (positional, named)
 }
 
-fn read_arg(pair: Pair<'_, Rule>) -> (&str, Option<Arg>) {
+fn read_arg(pair: Pair) -> (&str, Option<Arg>) {
     match pair.as_rule() {
         Rule::template_positional_arg => {
             let name = pair.as_str();
@@ -260,9 +265,7 @@ fn read_arg(pair: Pair<'_, Rule>) -> (&str, Option<Arg>) {
             let default = {
                 match default.as_rule() {
                     Rule::money_amount => Arg::Amount(read_amount(default)),
-                    Rule::string => {
-                        Arg::Tag(default.as_str())
-                    }
+                    Rule::string => Arg::Tag(default.as_str()),
                     _ => {
                         unreachable!()
                     }
@@ -274,21 +277,18 @@ fn read_arg(pair: Pair<'_, Rule>) -> (&str, Option<Arg>) {
     }
 }
 
-fn read_amount(item: Pair<'_, Rule>) -> Amount {
+fn read_amount(item: Pair) -> Amount {
     assert_eq!(item.as_rule(), Rule::money_amount);
     Amount(parse_amount!(item))
 }
 
-fn read_template_amount(pair: Pair<'_, Rule>) -> AmountTemplate {
+fn read_template_amount(pair: Pair) -> AmountTemplate {
     let (sign, pair) = match pair.as_rule() {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
     };
     let items = match pair.as_rule() {
-        Rule::builtin_sum => subrule!(pair)
-            .into_inner()
-            .into_iter()
-            .collect::<Vec<_>>(),
+        Rule::builtin_sum => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
         _ => vec![pair],
     };
     let mut sum = Vec::new();
@@ -297,21 +297,19 @@ fn read_template_amount(pair: Pair<'_, Rule>) -> AmountTemplate {
             Rule::money_amount => {
                 sum.push(AmountTemplateItem::Cst(read_amount(item)));
             }
-            Rule::identifier => {
-                sum.push(AmountTemplateItem::Arg(item.as_str()))
-            }
+            Rule::identifier => sum.push(AmountTemplateItem::Arg(item.as_str())),
             _ => unreachable!(),
         }
     }
     AmountTemplate { sign, sum }
 }
 
-fn read_cat(pair: Pair<'_, Rule>) -> Category {
+fn read_cat(pair: Pair) -> Category {
     use entry::Category::*;
     match pair.as_str() {
         "Pay" => Salary,
         "Food" => Food,
-        "Com" => Communication,
+        "Tech" => Tech,
         "Mov" => Movement,
         "Pro" => School,
         "Clean" => Cleaning,
@@ -320,7 +318,7 @@ fn read_cat(pair: Pair<'_, Rule>) -> Category {
     }
 }
 
-fn read_span(pair: Pair<'_, Rule>) -> Span {
+fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
     let duration = match pair.next().unwrap().as_str() {
@@ -359,12 +357,9 @@ fn read_span(pair: Pair<'_, Rule>) -> Span {
     }
 }
 
-fn read_template_tag(pair: Pair<'_, Rule>) -> TagTemplate {
+fn read_template_tag(pair: Pair) -> TagTemplate {
     let concat = match pair.as_rule() {
-        Rule::builtin_concat => subrule!(pair)
-            .into_inner()
-            .into_iter()
-            .collect::<Vec<_>>(),
+        Rule::builtin_concat => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
         Rule::string => vec![pair],
         _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
     };
@@ -388,7 +383,12 @@ fn read_template_tag(pair: Pair<'_, Rule>) -> TagTemplate {
     TagTemplate(strs)
 }
 
-fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
+fn validate_year<'i>(
+    path: &'i str,
+    errs: &mut ErrorRecord,
+    year: usize,
+    pairs: Vec<Pair<'i>>,
+) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
     for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
@@ -402,7 +402,13 @@ fn validate_year<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, pairs: 
     v
 }
 
-fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month: Month, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
+fn validate_month<'i>(
+    path: &'i str,
+    errs: &mut ErrorRecord,
+    year: usize,
+    month: Month,
+    pairs: Vec<Pair<'i>>,
+) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
     'pairs: for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_day);
@@ -430,10 +436,15 @@ fn validate_month<'i>(path: &'i str, errs: &mut ErrorRecord, year: usize, month:
     v
 }
 
-fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Vec<Pair<'i, Rule>>) -> Vec<AstItem<'i>> {
+fn validate_day<'i>(
+    path: &'i str,
+    errs: &mut ErrorRecord,
+    date: Date,
+    pairs: Vec<Pair<'i>>,
+) -> Vec<AstItem<'i>> {
     let mut v = Vec::new();
     'pairs: for pair in pairs {
-        let entry = subrule!(pair, Rule::entry);
+        let entry = subrule!(pair);
         let loc = (path, entry.as_span().clone());
         match entry.as_rule() {
             Rule::expand_entry => {
@@ -453,7 +464,7 @@ fn validate_day<'i>(path: &'i str, errs: &mut ErrorRecord, date: Date, pairs: Ve
     v
 }
 
-fn read_expand_entry(pairs: Pair<'_, Rule>) -> Instance {
+fn read_expand_entry(pairs: Pair) -> Instance {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
     let mut pos = Vec::new();
@@ -475,7 +486,7 @@ fn read_expand_entry(pairs: Pair<'_, Rule>) -> Instance {
     Instance { label, pos, named }
 }
 
-fn read_value(pair: Pair<'_, Rule>) -> Arg {
+fn read_value(pair: Pair) -> Arg {
     match pair.as_rule() {
         Rule::money_amount => Arg::Amount(read_amount(pair)),
         Rule::string => Arg::Tag(pair.as_str()),
@@ -485,7 +496,7 @@ fn read_value(pair: Pair<'_, Rule>) -> Arg {
     }
 }
 
-fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair<'_, Rule>) -> Option<Entry> {
+fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value: Option<Amount> = None;
     let mut cat: Option<Category> = None;
@@ -503,13 +514,7 @@ fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair<'_, Rule>
                 set_or_fail!(errs, span, read_span(item), "span", loc);
             }
             Rule::string => {
-                set_or_fail!(
-                    errs,
-                    tag,
-                    Tag(item.as_str().to_string()),
-                    "tag",
-                    loc
-                );
+                set_or_fail!(errs, tag, Tag(item.as_str().to_string()), "tag", loc);
             }
             _ => unreachable!(),
         }
