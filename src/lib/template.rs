@@ -11,6 +11,7 @@ pub mod models {
     pub use super::{
         Template,
         TagTemplate,
+        TagTemplateItem,
         AmountTemplate,
         AmountTemplateItem,
     };
@@ -67,13 +68,14 @@ pub enum AmountTemplateItem<'i> {
 pub fn instanciate(errs: &mut ErrorRecord, ast: Ast<'_>) -> Vec<(Date, Entry)> {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
+    use AstItem as Item;
     'ast: for item in ast {
         match item {
-            AstItem::Entry(date, entry) => entries.push((date, entry)),
-            AstItem::Template(name, loc, body) => {
+            Item::Entry(date, entry) => entries.push((date, entry)),
+            Item::Template(name, loc, body) => {
                 templates.insert(name.to_string(), (loc, body));
             }
-            AstItem::Instance(date, loc, instance) => {
+            Item::Instance(date, loc, instance) => {
                 match instanciate_item(errs, instance, date, &loc, &templates) {
                     Some(inst) => entries.push((date, inst)),
                     None => continue 'ast,
@@ -196,10 +198,11 @@ fn instantiate_amount(
 ) -> Option<(Amount, HashSet<String>)> {
     let mut sum = 0;
     let mut used = HashSet::new();
+    use AmountTemplateItem as Item;
     for item in &templ.sum {
         match item {
-            AmountTemplateItem::Cst(Amount(n)) => sum += n,
-            AmountTemplateItem::Arg(a) => {
+            Item::Cst(Amount(n)) => sum += n,
+            Item::Arg(a) => {
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {
@@ -241,15 +244,16 @@ fn instanciate_tag(
 ) -> Option<(Tag, HashSet<String>)> {
     let mut tag = String::new();
     let mut used = HashSet::new();
+    use TagTemplateItem as Item;
     for item in &templ.0 {
         match item {
-            TagTemplateItem::Day => tag.push_str(&date.day().to_string()),
-            TagTemplateItem::Month => tag.push_str(&date.month().to_string()),
-            TagTemplateItem::Year => tag.push_str(&date.year().to_string()),
-            TagTemplateItem::Date => tag.push_str(&date.to_string()),
-            TagTemplateItem::Weekday => tag.push_str(&date.weekday().to_string()),
-            TagTemplateItem::Raw(s) => tag.push_str(s),
-            TagTemplateItem::Arg(a) => {
+            Item::Day => tag.push_str(&date.day().to_string()),
+            Item::Month => tag.push_str(&date.month().to_string()),
+            Item::Year => tag.push_str(&date.year().to_string()),
+            Item::Date => tag.push_str(&date.to_string()),
+            Item::Weekday => tag.push_str(&date.weekday().to_string()),
+            Item::Raw(s) => tag.push_str(s),
+            Item::Arg(a) => {
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {

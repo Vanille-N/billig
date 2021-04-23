@@ -5,7 +5,10 @@
 
 use pest::Parser;
 use pest_derive::*;
+
+/// Wrapper around Pest's `Pair`
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
+/// Wrapper around Pest's `Pairs`
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
 use crate::lib::{
@@ -20,10 +23,12 @@ pub mod ast {
     pub use super::{Ast, AstItem};
 }
 
+/// Pest-generated parser
 #[derive(Parser)]
 #[grammar = "billig.pest"]
 struct BilligParser;
 
+/// A collection of AST items, i.e. entries and template definitions
 pub type Ast<'i> = Vec<AstItem<'i>>;
 
 /// Each item of the file
@@ -163,6 +168,10 @@ macro_rules! unwrap_or_fail {
     }};
 }
 
+/// Check all items
+///
+/// Sequentially validates each entry or template, records errors, accumulates the
+/// correct ones into the return value.
 pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> Ast<'i> {
     let mut ast = Vec::new();
     'pairs: for pair in pairs {
@@ -191,6 +200,10 @@ pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> 
     ast
 }
 
+/// Check that a template is valid
+///
+/// This can raise errors since the grammar can't ensure that no
+/// duplicate field is present or that no field definition is missing
 fn validate_template<'i>(
     path: &'i str,
     errs: &mut ErrorRecord,
@@ -241,6 +254,9 @@ fn validate_template<'i>(
     ))
 }
 
+/// Parse list of arguments
+///
+/// Grammar ensures this cannot fail
 fn read_args(pairs: Pairs) -> (Vec<&str>, Vec<(&str, Arg)>) {
     let mut positional = Vec::new();
     let mut named = Vec::new();
@@ -253,6 +269,9 @@ fn read_args(pairs: Pairs) -> (Vec<&str>, Vec<(&str, Arg)>) {
     (positional, named)
 }
 
+/// Parse a single positional or named argument
+///
+/// Grammar ensures this cannot fail
 fn read_arg(pair: Pair) -> (&str, Option<Arg>) {
     match pair.as_rule() {
         Rule::template_positional_arg => {
@@ -277,11 +296,19 @@ fn read_arg(pair: Pair) -> (&str, Option<Arg>) {
     }
 }
 
+/// Parse an amount of money
+///
+/// Grammar ensures this cannot fail, as accepted amounts
+/// are a subset of valid float representations
 fn read_amount(item: Pair) -> Amount {
     assert_eq!(item.as_rule(), Rule::money_amount);
     Amount(parse_amount!(item))
 }
 
+/// Parse a template item that expands to an amount
+///
+/// May contain `@Neg`, then possibly `@Sum`, then a list of either values
+/// or argument identifiers. Grammar ensures this cannot fail.
 fn read_template_amount(pair: Pair) -> AmountTemplate {
     let (sign, pair) = match pair.as_rule() {
         Rule::builtin_neg => (false, subrule!(pair)),
@@ -304,6 +331,9 @@ fn read_template_amount(pair: Pair) -> AmountTemplate {
     AmountTemplate { sign, sum }
 }
 
+/// Parse an expense category
+/// 
+/// Grammar ensures this cannot fail, as all categories have keyword status
 fn read_cat(pair: Pair) -> Category {
     use entry::Category::*;
     match pair.as_str() {
@@ -318,6 +348,10 @@ fn read_cat(pair: Pair) -> Category {
     }
 }
 
+/// Parse a span (length, window, count)
+/// 
+/// Grammar ensures this cannot fail, as lengths and windows are keywords,
+/// and counts are a subset of valid unsigned integers
 fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
@@ -357,6 +391,11 @@ fn read_span(pair: Pair) -> Span {
     }
 }
 
+/// Parse a template item that expands to a tag
+///
+/// Grammar ensures this cannot fail, as raw tags are valid strings,
+/// arguments are valid identifiers, and builtin placeholders (`@Day`, `@Date`, ...)
+/// have keyword status
 fn read_template_tag(pair: Pair) -> TagTemplate {
     let concat = match pair.as_rule() {
         Rule::builtin_concat => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
@@ -364,7 +403,7 @@ fn read_template_tag(pair: Pair) -> TagTemplate {
         _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
     };
     let mut strs = Vec::new();
-    use template::TagTemplateItem::*;
+    use TagTemplateItem::*;
     for item in concat {
         strs.push(match item.as_rule() {
             Rule::string => Raw(item.as_str()),
@@ -383,6 +422,9 @@ fn read_template_tag(pair: Pair) -> TagTemplate {
     TagTemplate(strs)
 }
 
+/// Parse a series of entries registered for the same year
+/// 
+/// The inner operation (`validate_month`) can produce errors
 fn validate_year<'i>(
     path: &'i str,
     errs: &mut ErrorRecord,
@@ -393,7 +435,7 @@ fn validate_year<'i>(
     for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
         let (month, rest) = decapitate!(pair);
-        let month = Month::from(month.as_str());
+        let month = Month::from(month.as_str()); // validated by the grammar
         let items = validate_month(path, errs, year, month, rest.collect::<Vec<_>>());
         for item in items {
             v.push(item);
@@ -402,6 +444,10 @@ fn validate_year<'i>(
     v
 }
 
+/// Parse a series of entries registered for the same month
+///
+/// The inner operation (`validate_day`) and the date creation can both
+/// produce errors
 fn validate_month<'i>(
     path: &'i str,
     errs: &mut ErrorRecord,
@@ -429,13 +475,16 @@ fn validate_month<'i>(
                     .with_hint("choose a date that exists")
                     .with_hint(e.fix_hint())
                     .register(errs);
-                continue 'pairs;
+                continue 'pairs; // error does not interrupt parsing
             }
         }
     }
     v
 }
 
+/// Parse a series of entries registered for the same day
+///
+/// One of the inner operations (`validate_plain_entry`) can produce errors
 fn validate_day<'i>(
     path: &'i str,
     errs: &mut ErrorRecord,
@@ -464,6 +513,10 @@ fn validate_day<'i>(
     v
 }
 
+/// Parse a template instanciation
+///
+/// Grammar ensures this cannot fail (but it may produce errors
+/// down the line during template expansion)
 fn read_expand_entry(pairs: Pair) -> Instance {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
@@ -486,6 +539,10 @@ fn read_expand_entry(pairs: Pair) -> Instance {
     Instance { label, pos, named }
 }
 
+/// Parse either an amount of money or a tag
+///
+/// Both of these types may appear as default values or as arguments
+/// passed to a template instanciation
 fn read_value(pair: Pair) -> Arg {
     match pair.as_rule() {
         Rule::money_amount => Arg::Amount(read_amount(pair)),
@@ -496,6 +553,10 @@ fn read_value(pair: Pair) -> Arg {
     }
 }
 
+/// Parse an explicit entry (i.e. not a template instanciation)
+///
+/// This can fail since the grammar can't ensure that there is no duplicate field
+/// definition or that there is no missing field
 fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value: Option<Amount> = None;

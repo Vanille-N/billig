@@ -5,6 +5,7 @@ COMMENT = _{ "//" ~ ( !"\n" ~ ANY )* }
 
 digit = _{ '0'..'9' }
 number = @{ digit+ }
+nonzero = @{ '1'..'9' ~ digit* }
 whitespace = _{ ( " " | "\n" | "\t" )+ }
 comma = _{ whitespace? ~ "," ~ whitespace? }
 semicolon = _{ whitespace? ~ ";" ~ whitespace? }
@@ -35,7 +36,7 @@ span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
 span_value = {
     span_duration
   ~ ( "<" ~ span_window ~ ">" )?
-  ~ ( whitespace? ~ number )?
+  ~ ( whitespace? ~ nonzero )?
 }
 // e.g.: val 42.69
 entry_val = _{ "val" ~ whitespace ~ money_amount }

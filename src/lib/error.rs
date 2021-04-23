@@ -39,6 +39,9 @@
 use crate::lib::parse::Rule;
 
 /// Location of an error
+///
+/// Contains information on the file in which the error
+/// occured and the precise span within that file
 pub type Loc<'i> = (&'i str, pest::Span<'i>);
 
 /// Report for a single error
@@ -84,9 +87,15 @@ enum ErrItem {
 }
 
 
+/// A collection of errors
+///
+/// Typically to keep record of all errors detected in one file,
+/// but the structure itself makes no assumption regarding the
+/// spatial or semantic relationship between these errors
 #[must_use]
 #[derive(Debug, Default)]
 pub struct ErrorRecord {
+    /// how many are errors, the rest are warnings
     fatal: usize,
     contents: Vec<Error>,
 }   
@@ -178,9 +187,9 @@ impl ErrorRecord {
 
 
 const RED: &str = "\x1b[0;91;1m";
-const YLW: &str = "\x1b[0;93;1m";
-const BLU: &str = "\x1b[0;96;1m";
-const WHT: &str = "\x1b[0;1m";
+const YELLOW: &str = "\x1b[0;93;1m";
+const BLUE: &str = "\x1b[0;96;1m";
+const WHITE: &str = "\x1b[0;1m";
 const NONE: &str = "\x1b[0m";
 
 use std::fmt;
@@ -189,16 +198,16 @@ impl fmt::Display for Error {
         let (color, header) = if self.fatal {
             (RED, "--> Error")
         } else {
-            (YLW, "--> Warning")
+            (YELLOW, "--> Warning")
         }; 
-        writeln!(f, "{}{}:{} {}{}", color, header, WHT, self.label, NONE)?;
+        writeln!(f, "{}{}:{} {}{}", color, header, WHITE, self.label, NONE)?;
         for item in &self.items {
             match item {
                 ErrItem::Block(err) => {
                     let mut align = "   ".to_string();
                     let mut align_found = false;
                     for line in format!("{}", err).split('\n') {
-                        write!(f, " {}|{}  {}", color, if align_found { &align } else { "" }, BLU)?;
+                        write!(f, " {}|{}  {}", color, if align_found { &align } else { "" }, BLUE)?;
                         for c in line.chars() {
                             match c {
                                 '-' if !align_found => {
@@ -219,10 +228,10 @@ impl fmt::Display for Error {
                     }
                 }
                 ErrItem::Text(txt) => {
-                    writeln!(f, " {}|  {}{}{}", color, WHT, txt, NONE)?;
+                    writeln!(f, " {}|  {}{}{}", color, WHITE, txt, NONE)?;
                 }
                 ErrItem::Hint(txt) => {
-                    writeln!(f, " {}|      {}? hint: {}{}", color, BLU, NONE, txt)?;
+                    writeln!(f, " {}|      {}? hint: {}{}", color, BLUE, NONE, txt)?;
                 }
             }
         }
@@ -237,7 +246,7 @@ impl fmt::Display for ErrorRecord {
         }
         let fatal = self.is_fatal();
         let count = if fatal { self.count_errors() } else { self.count_warnings() };
-        let color = if fatal { RED } else { YLW };
+        let color = if fatal { RED } else { YELLOW };
         let trunc = 10;
         for err in self.contents.iter().filter(|err| err.fatal == fatal).take(trunc) {
             // only print errors with the maximum fatality
@@ -248,15 +257,16 @@ impl fmt::Display for ErrorRecord {
         }
         let plural = if count > 1 { "s" } else { "" };
         if fatal {
-            writeln!(f, "{}Fatal: {}{} error{} emitted{}", color, WHT, count, plural, NONE)?;
+            writeln!(f, "{}Fatal: {}{} error{} emitted{}", color, WHITE, count, plural, NONE)?;
         } else {
-            writeln!(f, "{}Nonfatal: {}{} warning{} emitted{}", color, WHT, count, plural, NONE)?;
+            writeln!(f, "{}Nonfatal: {}{} warning{} emitted{}", color, WHITE, count, plural, NONE)?;
         }
         Ok(())
     }
 }
 
 
+/// Convert rule names to user-friendly information about their purpose
 fn rule_rename(rule: &Rule) -> String {
     use Rule::*;
     String::from(match rule {
@@ -264,6 +274,7 @@ fn rule_rename(rule: &Rule) -> String {
         COMMENT => "a comment",
         digit => "a digit (0..9)",
         number => "a number",
+        nonzero => "a non-null number",
         comma => "a comma (',') separator",
         whitespace => "at least one whitespace",
         semicolon => "a semicolon (';') separator",
