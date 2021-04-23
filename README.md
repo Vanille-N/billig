@@ -29,7 +29,7 @@ Data is stored in `.bil` files, which are parsed using [pest.rs](https://pest.rs
 
 The following example gives an overview of the available constructs.
 
-```
+```java
 2020:
     Sep:
         01: val -300, type Mov, span Year<Post> 1, tag "Train pass";
