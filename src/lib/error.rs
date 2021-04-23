@@ -1,21 +1,88 @@
+//! Pretty-printing facility for error messages
+//!
+//! In fairness, this is mostly a wrapper around `pest::error::Error::new_from_span`,
+//! the difficult part of the formatting is handled and `Error` only adds aggregation
+//! of messages as well as colored output.
+//! 
+//! # Example
+//!
+//! ```rust
+//! Error::new("Unused argument")
+//!     .nonfatal()
+//!     .with_span(inst_loc, format!("in instanciation of '{}'", inst_name))
+//!     .with_text(format!("Argument '{}' is provided but not used", arg_name))
+//!     .with_span(templ_loc, "defined here")
+//!     .with_hint("remove argument or use in template")
+//!     .register(errors);
+//! ```
+//!
+//! ```txt
+//! --> Warning: Unused argument
+//!  |     --> ../examples/failures/unused.bil:10:13
+//!  |      |
+//!  |   10 |         01: !self_sufficient 0 other="";
+//!  |      |             ^-------------------------^
+//!  |      |
+//!  |      = in instanciation of 'self_sufficient'
+//!  |  Argument 'other' is provided but not used
+//!  |     --> ../examples/failures/unused.bil:1:1
+//!  |      |
+//!  |    1 | !self_sufficient unused extra="" {
+//!  |      | ...
+//!  |    6 | }
+//!  |      | ^
+//!  |      |
+//!  |      = defined here
+//!  |      ? hint: remove argument or use in template
+//! ```
+
 use crate::lib::parse::Rule;
 
+/// Location of an error
 pub type Loc<'i> = (&'i str, pest::Span<'i>);
 
+/// Report for a single error
+///
+/// All messages (`label` passed with `new`, arguments of `with_hint`
+/// and `with_text`) should fit in a single line.
+///
+/// ```rust
+/// // NO
+/// Error::new("Fatal failure\ngeneral message\nspanning several lines\nhint to fix\nnote\nsee
+/// documentation")
+///     .register(errors);
+///
+/// // YES
+/// Error::new("Fatal failure")
+///     .with_text("general message")
+///     .with_text("spanning several lines")
+///     .with_hint("hint to fix")
+///     .with_hint("note")
+///     .with_text("see documentation")
+///     .register(errors);
+/// ```
 #[must_use]
 #[derive(Debug)]
 pub struct Error {
+    /// determines the error label (warning/error) and the color (yellow/red)
     fatal: bool,
+    /// name of the error
     label: String,
+    /// contents of the error
     items: Vec<ErrItem>,
 }
 
+/// Kinds of items that can be added to an error report
 #[derive(Debug)]
 enum ErrItem {
+    /// code block
     Block(pest::error::Error<Rule>),
+    /// important message
     Text(String),
+    /// recommendations for fixes
     Hint(String),
 }
+
 
 #[must_use]
 #[derive(Debug, Default)]
@@ -25,6 +92,7 @@ pub struct ErrorRecord {
 }   
 
 impl Error {
+    /// Create a new error
     pub fn new<S>(msg: S) -> Self
     where S: ToString {
         Self {
@@ -34,16 +102,19 @@ impl Error {
         }
     }
 
+    /// Mark as a warning rather that a fatal error
     pub fn nonfatal(mut self) -> Self {
         self.fatal = false;
         self
     }
 
+    /// Add a pre-existing error (e.g. to build from a parsing error)
     pub fn with_error(mut self, err: pest::error::Error<Rule>) -> Self {
         self.items.push(ErrItem::Block(err.renamed_rules(rule_rename)));
         self
     }
 
+    /// Add a code block and its associated message
     pub fn with_span<S>(mut self, loc: &Loc, msg: S) -> Self
     where S: ToString {
         self.items.push(ErrItem::Block(pest::error::Error::new_from_span(
@@ -55,41 +126,49 @@ impl Error {
         self
     }
 
+    /// Add an important note
     pub fn with_text<S>(mut self, msg: S) -> Self
     where S: ToString {
         self.items.push(ErrItem::Text(msg.to_string()));
         self
     }
 
+    /// Add a hint on how to fix
     pub fn with_hint<S>(mut self, msg: S) -> Self
     where S: ToString {
         self.items.push(ErrItem::Hint(msg.to_string()));
         self
     }
 
+    /// Consume the error and add it to the pool of recorded errors
     pub fn register(self, record: &mut ErrorRecord) {
         record.register(self);
     }
 }
 
 impl ErrorRecord {
+    /// Initialize a new pool of errors (e.g. to record errors from another file)
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Checks if any of the recorded errors are fatal
     pub fn is_fatal(&self) -> bool {
         self.fatal > 0
     }
 
+    /// Number of fatal errors
     pub fn count_errors(&self) -> usize {
         self.fatal
     }
 
+    /// Number of nonfatal errors
     pub fn count_warnings(&self) -> usize {
         self.contents.len() - self.fatal
     }
 
-    pub fn register(&mut self, err: Error) {
+    /// Add a new error to the pool
+    fn register(&mut self, err: Error) {
         if err.fatal {
             self.fatal += 1;
         }
@@ -119,7 +198,7 @@ impl fmt::Display for Error {
                     let mut align = "   ".to_string();
                     let mut align_found = false;
                     for line in format!("{}", err).split('\n') {
-                        write!(f, "     {}|{}  {}", color, if align_found { &align } else { "" }, BLU)?;
+                        write!(f, " {}|{}  {}", color, if align_found { &align } else { "" }, BLU)?;
                         for c in line.chars() {
                             match c {
                                 '-' if !align_found => {
@@ -140,10 +219,10 @@ impl fmt::Display for Error {
                     }
                 }
                 ErrItem::Text(txt) => {
-                    writeln!(f, "     {}|  {}{}{}", color, WHT, txt, NONE)?;
+                    writeln!(f, " {}|  {}{}{}", color, WHT, txt, NONE)?;
                 }
                 ErrItem::Hint(txt) => {
-                    writeln!(f, "     {}|      {}? hint: {}{}", color, BLU, NONE, txt)?;
+                    writeln!(f, " {}|      {}? hint: {}{}", color, BLU, NONE, txt)?;
                 }
             }
         }
@@ -196,7 +275,7 @@ fn rule_rename(rule: &Rule) -> String {
         tag_text => "a tag ('\"foo\"')",
         string => "a string of non-'\"' characters",
         identifier => "an identifier composed of a..zA..Z-_",
-        expense_type => "one of Pay, Food, Com, Mov, Pro, Clean, Home",
+        expense_type => "one of Pay, Food, Tech, Mov, Pro, Clean, Home",
         span_duration => "one of Day, Week, Month, Year",
         span_window => "one of Ante, Pred, Curr, Succ, Post",
         span_value => "a number",

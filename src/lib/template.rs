@@ -160,7 +160,7 @@ fn perform_replacements(
                 Error::new("Unused argument")
                     .nonfatal()
                     .with_span(&loc, format!("in instanciation of '{}'", name))
-                    .with_text(format!("Argument {} is provided but not used", argname))
+                    .with_text(format!("Argument '{}' is provided but not used", argname))
                     .with_span(&templ.0, "defined here")
                     .with_hint("remove argument or use in template")
                     .register(errs);
