@@ -72,12 +72,12 @@ pub struct Error {
     /// name of the error
     label: String,
     /// contents of the error
-    items: Vec<ErrItem>,
+    items: Vec<Item>,
 }
 
 /// Kinds of items that can be added to an error report
 #[derive(Debug)]
-enum ErrItem {
+enum Item {
     /// code block
     Block(pest::error::Error<Rule>),
     /// important message
@@ -94,7 +94,7 @@ enum ErrItem {
 /// spatial or semantic relationship between these errors
 #[must_use]
 #[derive(Debug, Default)]
-pub struct ErrorRecord {
+pub struct Record {
     /// how many are errors, the rest are warnings
     fatal: usize,
     contents: Vec<Error>,
@@ -119,14 +119,14 @@ impl Error {
 
     /// Add a pre-existing error (e.g. to build from a parsing error)
     pub fn with_error(mut self, err: pest::error::Error<Rule>) -> Self {
-        self.items.push(ErrItem::Block(err.renamed_rules(rule_rename)));
+        self.items.push(Item::Block(err.renamed_rules(rule_rename)));
         self
     }
 
     /// Add a code block and its associated message
     pub fn with_span<S>(mut self, loc: &Loc, msg: S) -> Self
     where S: ToString {
-        self.items.push(ErrItem::Block(pest::error::Error::new_from_span(
+        self.items.push(Item::Block(pest::error::Error::new_from_span(
             pest::error::ErrorVariant::CustomError {
                 message: msg.to_string(),
             },
@@ -138,24 +138,24 @@ impl Error {
     /// Add an important note
     pub fn with_text<S>(mut self, msg: S) -> Self
     where S: ToString {
-        self.items.push(ErrItem::Text(msg.to_string()));
+        self.items.push(Item::Text(msg.to_string()));
         self
     }
 
     /// Add a hint on how to fix
     pub fn with_hint<S>(mut self, msg: S) -> Self
     where S: ToString {
-        self.items.push(ErrItem::Hint(msg.to_string()));
+        self.items.push(Item::Hint(msg.to_string()));
         self
     }
 
     /// Consume the error and add it to the pool of recorded errors
-    pub fn register(self, record: &mut ErrorRecord) {
+    pub fn register(self, record: &mut Record) {
         record.register(self);
     }
 }
 
-impl ErrorRecord {
+impl Record {
     /// Initialize a new pool of errors (e.g. to record errors from another file)
     pub fn new() -> Self {
         Self::default()
@@ -203,7 +203,7 @@ impl fmt::Display for Error {
         writeln!(f, "{}{}:{} {}{}", color, header, WHITE, self.label, NONE)?;
         for item in &self.items {
             match item {
-                ErrItem::Block(err) => {
+                Item::Block(err) => {
                     let mut align = "   ".to_string();
                     let mut align_found = false;
                     for line in format!("{}", err).split('\n') {
@@ -227,10 +227,10 @@ impl fmt::Display for Error {
                         writeln!(f)?;
                     }
                 }
-                ErrItem::Text(txt) => {
+                Item::Text(txt) => {
                     writeln!(f, " {}|  {}{}{}", color, WHITE, txt, NONE)?;
                 }
-                ErrItem::Hint(txt) => {
+                Item::Hint(txt) => {
                     writeln!(f, " {}|      {}? hint: {}{}", color, BLUE, NONE, txt)?;
                 }
             }
@@ -239,7 +239,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl fmt::Display for ErrorRecord {
+impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.contents.is_empty() {
             return Ok(());
