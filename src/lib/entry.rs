@@ -31,10 +31,10 @@ impl fmt::Display for Tag {
 
 #[derive(Debug, Clone)]
 pub struct Entry {
-    pub value: Amount,
-    pub cat: Category,
-    pub span: Span,
-    pub tag: Tag,
+    value: Amount,
+    cat: Category,
+    span: Span,
+    tag: Tag,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -50,9 +50,9 @@ pub enum Category {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Span {
-    pub duration: Duration,
-    pub window: Window,
-    pub count: usize,
+    duration: Duration,
+    window: Window,
+    count: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -102,3 +102,59 @@ impl ops::Neg for Amount {
         Self(-self.0)
     }
 }
+
+impl Entry {
+    pub fn from(value: Amount, cat: Category, span: Span, tag: Tag) -> Self {
+        Self { value, cat, span, tag }
+    }
+}
+
+impl Span {
+    pub fn from(duration: Duration, window: Window, count: usize) -> Self {
+        Self { duration, window, count }
+    }
+}
+
+impl Category {
+    pub fn from(s: &str) -> Option<Self> {
+        use Category::*;
+        Some(match s {
+            "Pay" => Salary,
+            "Food" => Food,
+            "Tech" => Tech,
+            "Mov" => Movement,
+            "Pro" => School,
+            "Clean" => Cleaning,
+            "Home" => Home,
+            _ => return None,
+        })
+    }
+}
+
+impl Duration {
+    pub fn from(s: &str) -> Option<Self> {
+        use Duration::*;
+        Some(match s {
+            "Day" => Day,
+            "Week" => Week,
+            "Month" => Month,
+            "Year" => Year,
+            _ => return None,
+        })
+    }
+}
+
+impl Window {
+    pub fn from(s: &str) -> Option<Self> {
+        use Window::*;
+        Some(match s {
+            "Curr" => Current,
+            "Post" => Posterior,
+            "Ante" => Anterior,
+            "Pred" => Precedent,
+            "Succ" => Successor,
+            _ => return None,
+        })
+    }
+}
+
