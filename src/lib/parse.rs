@@ -45,6 +45,58 @@ pub enum AstItem<'i> {
     Template(&'i str, Template<'i>),
 }
 
+struct Once<'i, T> {
+    name: &'i str,
+    hint: &'i str,
+    loc: &'i error::Loc<'i>,
+    valid: bool,
+    data: Option<T>,
+}
+
+impl<'i, T> Once<'i, T> {
+    fn new(name: &'i str, hint: &'i str, loc: &'i error::Loc) -> Self {
+        Self {
+            name,
+            hint,
+            loc,
+            valid: true, 
+            data: None,
+        }
+    }
+    
+    fn try_set(&mut self, val: T, errs: &mut error::Record) {
+        if self.data.is_some() {
+            error::Error::new("Duplicate field definition")
+                .with_span(self.loc, format!("attempt to override {}", self.name))
+                .with_text("Each field may only be defined once")
+                .with_hint("remove one of the field definitions")
+                .register(errs);
+            self.valid = false;
+        }
+        self.data = Some(val);
+    }
+
+    fn try_get(self, errs: &mut error::Record) -> Option<T> {
+        if self.valid {
+            if self.data.is_none() {
+                error::Error::new("Missing field definition")
+                    .with_span(self.loc, format!("'{}' may not be omitted", self.name))
+                    .with_text("Each field must be defined once")
+                    .with_hint(format!(
+                            "add definition for the missing field: '{} {}'",
+                            self.name, self.hint
+                    ))
+                    .register(errs);
+                None
+            } else {
+                self.data
+            }
+        } else {
+            None
+        }
+    }
+}
+
 /// Get the contents of file `path`
 ///
 /// The return value may be non-empty even if some errors (including fatal ones) occured.
@@ -125,51 +177,7 @@ macro_rules! parse_amount {
     };
 }
 
-// set-once value
-macro_rules! set_or_fail {
-    ( $errs:expr, $var:expr, $val:expr, $name:expr, $loc:expr) => {{
-        if $var.is_some() {
-            error::Error::new("Duplicate field definition")
-                .with_span(&$loc, format!("attempt to override {}", $name))
-                .with_text("Each field may only be defined once")
-                .with_hint("remove one of the field definitions")
-                .register($errs);
-            return None;
-        }
-        $var = Some($val);
-    }};
-}
 
-// non-optional value
-macro_rules! unwrap_or_fail {
-    ( $errs:expr, $val:expr, $name:expr, $loc:expr ) => {{
-        match $val {
-            Some(v) => v,
-            None => {
-                let name = $name;
-                // since $name is known at compile-time, the compiler
-                // will deal with this. It beats having to provide more arguments
-                // to the macro.
-                let hint_value = match name {
-                    "tag" => "\"Some information\"",
-                    "val" => "42.0",
-                    "span" => "Year<Succ> 1",
-                    "type" => "Food",
-                    _ => unreachable!(),
-                };
-                error::Error::new("Missing field definition")
-                    .with_span(&$loc, format!("'{}' may not be omitted", name))
-                    .with_text("Each field must be defined once")
-                    .with_hint(format!(
-                        "add definition for the missing field: '{} {}'",
-                        name, hint_value
-                    ))
-                    .register($errs);
-                return None;
-            }
-        }
-    }};
-}
 
 /// Check all items
 ///
@@ -219,31 +227,31 @@ fn validate_template<'i>(
     assert_eq!(args.as_rule(), Rule::template_args);
     let (positional, named) = read_args(args.into_inner());
     assert_eq!(body.as_rule(), Rule::template_expansion_contents);
-    let mut value: Option<models::amount::Template> = None;
-    let mut cat: Option<Category> = None;
-    let mut span: Option<Span> = None;
-    let mut tag: Option<models::tag::Template> = None;
+    let mut value = Once::new("val", "42.69", &loc);
+    let mut cat = Once::new("type", "Food", &loc);
+    let mut span = Once::new("span", "Week<Post> 2", &loc);
+    let mut tag = Once::new("tag", "Some information", &loc);
     for sub in body.into_inner() {
         match sub.as_rule() {
             Rule::template_money_amount => {
-                set_or_fail!(errs, value, read_template_amount(subrule!(sub)), "val", loc);
+                value.try_set(read_template_amount(subrule!(sub)), errs);
             }
             Rule::expense_type => {
-                set_or_fail!(errs, cat, read_cat(sub), "type", loc);
+                cat.try_set(read_cat(sub), errs);
             }
             Rule::span_value => {
-                set_or_fail!(errs, span, read_span(sub), "span", loc);
+                span.try_set(read_span(sub), errs);
             }
             Rule::template_tag => {
-                set_or_fail!(errs, tag, read_template_tag(subrule!(sub)), "tag", loc);
+                tag.try_set(read_template_tag(subrule!(sub)), errs);
             }
             _ => unreachable!(),
         }
     }
-    let value = unwrap_or_fail!(errs, value, "val", loc);
-    let cat = unwrap_or_fail!(errs, cat, "cat", loc);
-    let span = unwrap_or_fail!(errs, span, "span", loc);
-    let tag = unwrap_or_fail!(errs, tag, "tag", loc);
+    let value = value.try_get(errs)?;
+    let cat = cat.try_get(errs)?;
+    let span = span.try_get(errs)?;
+    let tag = tag.try_get(errs)?;
     Some((
         identifier,
         Template::new(
@@ -536,30 +544,30 @@ fn read_value(pair: Pair) -> Arg {
 /// definition or that there is no missing field
 fn validate_plain_entry(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
-    let mut value: Option<Amount> = None;
-    let mut cat: Option<Category> = None;
-    let mut span: Option<Span> = None;
-    let mut tag: Option<Tag> = None;
+    let mut value = Once::new("val", "42.69", &loc);
+    let mut cat = Once::new("type", "Food", &loc);
+    let mut span = Once::new("span", "Week<Post> 2", &loc);
+    let mut tag = Once::new("tag", "Some information", &loc);
     for item in pair.into_inner() {
         match item.as_rule() {
             Rule::money_amount => {
-                set_or_fail!(errs, value, parse_amount!(item), "val", loc);
+                value.try_set(parse_amount!(item), errs);
             }
             Rule::expense_type => {
-                set_or_fail!(errs, cat, read_cat(item), "cat", loc);
+                cat.try_set(read_cat(item), errs);
             }
             Rule::span_value => {
-                set_or_fail!(errs, span, read_span(item), "span", loc);
+                span.try_set(read_span(item), errs);
             }
             Rule::string => {
-                set_or_fail!(errs, tag, Tag(item.as_str().to_string()), "tag", loc);
+                tag.try_set(Tag(item.as_str().to_string()), errs);
             }
             _ => unreachable!(),
         }
     }
-    let value = unwrap_or_fail!(errs, value, "val", loc);
-    let cat = unwrap_or_fail!(errs, cat, "cat", loc);
-    let span = unwrap_or_fail!(errs, span, "span", loc);
-    let tag = unwrap_or_fail!(errs, tag, "tag", loc);
+    let value = value.try_get(errs)?;
+    let cat = cat.try_get(errs)?;
+    let span = span.try_get(errs)?;
+    let tag = tag.try_get(errs)?;
     Some(Entry::from(value, cat, span, tag))
 }
