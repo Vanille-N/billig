@@ -342,7 +342,16 @@ impl Date {
     /// First Sunday after the current date
     pub fn end_of_week(self) -> Self {
         self.jump_day(6 - self.weekday() as isize)
-    }    
+    }
+
+    /// Set maximum value for day
+    pub fn cap_day(mut self, d: u8) -> Self {
+        let m = self.month;
+        while self.day >= d && self.month == m {
+            self = self.prev();
+        }
+        self
+    }
 }
 
 

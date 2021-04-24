@@ -136,19 +136,19 @@ impl Span {
                 let d = dt.end_of_week();
                 (d.next(), d.jump_day(7 * nb))
             }
-            (Month, Current) => (dt.start_of_month(), dt.end_of_month().jump_month(nb - 1)),
-            (Month, Posterior) => (dt, dt.jump_month(nb).prev()),
+            (Month, Current) => (dt.start_of_month(), dt.jump_month(nb - 1).end_of_month()),
+            (Month, Posterior) => (dt, dt.jump_month(nb).cap_day(dt.day())),
             (Month, Anterior) => (dt.jump_month(-nb).next(), dt),
             (Month, Precedent) => {
                 let d = dt.start_of_month();
                 (d.jump_month(-nb), d.prev())
             }
             (Month, Successor) => {
-                let d = dt.start_of_month();
-                (d.jump_month(-nb), d.prev())
+                let d = dt.end_of_month();
+                (d.next(), d.jump_month(nb))
             }
             (Year, Current) => (dt.start_of_year(), dt.end_of_year().jump_year(nb - 1)),
-            (Year, Posterior) => (dt, dt.jump_year(nb).prev()),
+            (Year, Posterior) => (dt, dt.jump_year(nb).cap_day(dt.day())),
             (Year, Anterior) => (dt.jump_year(-nb).next(), dt),
             (Year, Successor) => {
                 let d = dt.end_of_year();
@@ -248,11 +248,36 @@ mod test {
     }
 
     #[test]
-    fn week_jumps() { unimplemented!() }
+    fn week_jumps() {
+        check!(dt!(2020-Mar-12), span!(Week<Current>2), dt!(2020-Mar-9), dt!(2020-Mar-22));
+        check!(dt!(2020-Sep-8), span!(Week<Precedent>3), dt!(2020-Aug-17), dt!(2020-Sep-6));
+        check!(dt!(2020-Aug-9), span!(Week<Successor>6), dt!(2020-Aug-10), dt!(2020-Sep-20));
+        check!(dt!(2020-May-23), span!(Week<Anterior>4), dt!(2020-Apr-26), dt!(2020-May-23));
+        check!(dt!(2020-Dec-30), span!(Week<Posterior>1), dt!(2020-Dec-30), dt!(2021-Jan-5));
+    }
 
     #[test]
-    fn month_jumps() { unimplemented!() }
+    fn month_jumps() {
+        check!(dt!(2020-May-31), span!(Month<Current>5), dt!(2020-May-1), dt!(2020-Sep-30));
+        check!(dt!(2020-Feb-29), span!(Month<Current>2), dt!(2020-Feb-1), dt!(2020-Mar-31));
+        check!(dt!(2020-Feb-29), span!(Month<Posterior>12), dt!(2020-Feb-29), dt!(2021-Feb-28));
+        check!(dt!(2020-Feb-28), span!(Month<Posterior>1), dt!(2020-Feb-28), dt!(2020-Mar-27));
+        check!(dt!(2020-Aug-15), span!(Month<Successor>3), dt!(2020-Sep-1), dt!(2020-Nov-30));
+        check!(dt!(2020-Jan-31), span!(Month<Successor>4), dt!(2020-Feb-1), dt!(2020-May-31));
+        check!(dt!(2020-Nov-30), span!(Month<Precedent>4), dt!(2020-Jul-1), dt!(2020-Oct-31));
+        check!(dt!(2020-Dec-1), span!(Month<Precedent>2), dt!(2020-Oct-1), dt!(2020-Nov-30));
+        check!(dt!(2020-Mar-12), span!(Month<Anterior>24), dt!(2018-Mar-13), dt!(2020-Mar-12));
+        check!(dt!(2020-Mar-1), span!(Month<Anterior>2), dt!(2020-Jan-2), dt!(2020-Mar-1));
+        check!(dt!(2020-Feb-29), span!(Month<Anterior>1), dt!(2020-Jan-30), dt!(2020-Feb-29));
+    }
 
     #[test]
-    fn year_jumps() { unimplemented!() }
+    fn year_jumps() {
+        check!(dt!(2020-Jan-15), span!(Year<Current>5), dt!(2020-Jan-1), dt!(2024-Dec-31));
+        check!(dt!(2020-Feb-29), span!(Year<Posterior>2), dt!(2020-Feb-29), dt!(2022-Feb-28));
+        check!(dt!(2020-Mar-1), span!(Year<Posterior>1), dt!(2020-Mar-1), dt!(2021-Feb-28));
+        check!(dt!(2018-Oct-30), span!(Year<Successor>3), dt!(2019-Jan-1), dt!(2021-Dec-31));
+        check!(dt!(2020-Dec-31), span!(Year<Precedent>10), dt!(2010-Jan-1), dt!(2019-Dec-31));
+        check!(dt!(2020-Dec-31), span!(Year<Anterior>10), dt!(2011-Jan-1), dt!(2020-Dec-31));
+    }
 }
