@@ -12,7 +12,7 @@ pub mod fields {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Amount(pub isize);
+pub struct Amount(isize);
 
 #[derive(Debug, Clone)]
 pub struct Tag(pub String);
@@ -70,4 +70,35 @@ pub enum Window {
     Anterior,
     Precedent,
     Successor,
+}
+
+impl Amount {
+    pub fn zero() -> Self {
+        Self(0)
+    }
+
+    pub fn from(i: isize) -> Self {
+        Self(i)
+    }
+}
+
+use std::ops;
+impl ops::Add for Amount {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self(self.0 + other.0)
+    }
+}
+
+impl ops::AddAssign for Amount {
+    fn add_assign(&mut self, other: Self) {
+        self.0 += other.0;
+    }
+}
+
+impl ops::Neg for Amount {
+    type Output = Self;
+    fn neg(self) -> Self {
+        Self(-self.0)
+    }
 }
