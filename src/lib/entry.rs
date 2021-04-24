@@ -121,7 +121,7 @@ impl Span {
         use Window::*;
         let nb = self.count as isize;
         match (self.duration, self.window) {
-            (Day, Precedent) => (dt.jump_day(nb), dt.prev()),
+            (Day, Precedent) => (dt.jump_day(-nb), dt.prev()),
             (Day, Successor) => (dt.next(), dt.jump_day(nb)),
             (Day, Anterior) => (dt.jump_day(-nb).next(), dt),
             (Day, _) => (dt, dt.jump_day(nb).prev()),
@@ -148,6 +148,16 @@ impl Span {
                 (d.jump_month(-nb), d.prev())
             }
             (Year, Current) => (dt.start_of_year(), dt.end_of_year().jump_year(nb - 1)),
+            (Year, Posterior) => (dt, dt.jump_year(nb).prev()),
+            (Year, Anterior) => (dt.jump_year(-nb).next(), dt),
+            (Year, Successor) => {
+                let d = dt.end_of_year();
+                (d.next(), d.jump_year(nb))
+            }
+            (Year, Precedent) => {
+                let d = dt.start_of_year();
+                (d.jump_year(-nb), d.prev())
+            }
         }
     }
 }
@@ -195,3 +205,54 @@ impl Window {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::{
+        *,
+        Window::*,
+        Duration::*,
+    };
+    use crate::lib::date::{
+        Month::*,
+        Date,
+    };
+        
+    macro_rules! dt {
+        ( $y:tt - $m:tt - $d:tt ) => {
+            Date::from($y, $m, $d).unwrap()
+        }
+    }
+    macro_rules! span {
+        ( $dur:tt < $win:tt > $nb:tt ) => {
+            Span {
+                duration: $dur,
+                window: $win,
+                count: $nb,
+            }
+        }
+    }
+
+    macro_rules! check {
+        ( $date:expr, $span:expr, $start:expr, $end:expr ) => {
+            assert_eq!($span.period($date), ($start, $end));
+        }
+    }
+
+    #[test]
+    fn day_jumps() {
+        check!(dt!(2020-May-8), span!(Day<Current>3), dt!(2020-May-8), dt!(2020-May-10));
+        check!(dt!(2020-Sep-1), span!(Day<Precedent>5), dt!(2020-Aug-27), dt!(2020-Aug-31));
+        check!(dt!(2020-Dec-30), span!(Day<Anterior>2), dt!(2020-Dec-29), dt!(2020-Dec-30));
+        check!(dt!(2020-Jan-1), span!(Day<Posterior>50), dt!(2020-Jan-1), dt!(2020-Feb-19));
+        check!(dt!(2020-Feb-28), span!(Day<Successor>3), dt!(2020-Feb-29), dt!(2020-Mar-2));
+    }
+
+    #[test]
+    fn week_jumps() { unimplemented!() }
+
+    #[test]
+    fn month_jumps() { unimplemented!() }
+
+    #[test]
+    fn year_jumps() { unimplemented!() }
+}
