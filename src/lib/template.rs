@@ -285,12 +285,7 @@ fn perform_replacements(
             _ => (),
         }
     }
-    Some(Entry {
-        value,
-        cat: templ.cat,
-        span: templ.span,
-        tag,
-    })
+    Some(Entry::from(value, templ.cat, templ.span, tag))
 }
 
 /// Expand amount
