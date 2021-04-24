@@ -14,13 +14,16 @@ type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 use crate::lib::{
     date::{Date, Month},
     entry::{self, Amount, Category, Entry, Span, Tag},
-    error::{Error, ErrorRecord, Loc},
-    template::{self, models::*, Arg, Instance},
+    error,
+    template::models::{self, Arg, Template, Instance},
 };
 
 /// Convenient exports
 pub mod ast {
-    pub use super::{Ast, AstItem};
+    pub use super::{
+        Ast,
+        AstItem as Item
+    };
 }
 
 /// Pest-generated parser
@@ -37,9 +40,9 @@ pub enum AstItem<'i> {
     /// an explicit entry with its date
     Entry(Date, Entry),
     /// a template expansion with its date
-    Instance(Date, Loc<'i>, Instance<'i>),
+    Instance(Date, Instance<'i>),
     /// a template definition
-    Template(&'i str, Loc<'i>, Template<'i>),
+    Template(&'i str, Template<'i>),
 }
 
 /// Get the contents of file `path`
@@ -50,11 +53,11 @@ pub enum AstItem<'i> {
 ///
 /// Caller should determine the success of this function not through its return value
 /// but by querying `errs` (e.g. by checking `errs.is_fatal()` or `errs.count_errors()`)
-pub fn extract<'i>(path: &'i str, errs: &mut ErrorRecord, contents: &'i str) -> Ast<'i> {
+pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -> Ast<'i> {
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
         Err(e) => {
-            Error::new("Parsing failure")
+            error::Error::new("Parsing failure")
                 .with_error(e.with_path(path))
                 .register(errs);
             return Vec::new();
@@ -118,7 +121,7 @@ macro_rules! parse_usize {
 macro_rules! parse_amount {
     ( $node:expr ) => {
         // safe to .unwrap() because the grammar validated it already
-        ($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize
+        Amount::from(($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize)
     };
 }
 
@@ -126,7 +129,7 @@ macro_rules! parse_amount {
 macro_rules! set_or_fail {
     ( $errs:expr, $var:expr, $val:expr, $name:expr, $loc:expr) => {{
         if $var.is_some() {
-            Error::new("Duplicate field definition")
+            error::Error::new("Duplicate field definition")
                 .with_span(&$loc, format!("attempt to override {}", $name))
                 .with_text("Each field may only be defined once")
                 .with_hint("remove one of the field definitions")
@@ -154,7 +157,7 @@ macro_rules! unwrap_or_fail {
                     "type" => "Food",
                     _ => unreachable!(),
                 };
-                Error::new("Missing field definition")
+                error::Error::new("Missing field definition")
                     .with_span(&$loc, format!("'{}' may not be omitted", name))
                     .with_text("Each field must be defined once")
                     .with_hint(format!(
@@ -172,7 +175,7 @@ macro_rules! unwrap_or_fail {
 ///
 /// Sequentially validates each entry or template, records errors, accumulates the
 /// correct ones into the return value.
-pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> Ast<'i> {
+pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -> Ast<'i> {
     let mut ast = Vec::new();
     'pairs: for pair in pairs {
         let loc = (path, pair.as_span().clone());
@@ -182,7 +185,7 @@ pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> 
                     Some(x) => x,
                     None => continue 'pairs,
                 };
-                ast.push(AstItem::Template(name, loc, templ));
+                ast.push(AstItem::Template(name, templ));
             }
             Rule::entries_year => {
                 let (head, body) = decapitate!(pair);
@@ -206,7 +209,7 @@ pub fn validate<'i>(path: &'i str, errs: &mut ErrorRecord, pairs: Pairs<'i>) -> 
 /// duplicate field is present or that no field definition is missing
 fn validate_template<'i>(
     path: &'i str,
-    errs: &mut ErrorRecord,
+    errs: &mut error::Record,
     pair: Pair<'i>,
 ) -> Option<(&'i str, Template<'i>)> {
     let loc = (path, pair.as_span().clone());
@@ -216,10 +219,10 @@ fn validate_template<'i>(
     assert_eq!(args.as_rule(), Rule::template_args);
     let (positional, named) = read_args(args.into_inner());
     assert_eq!(body.as_rule(), Rule::template_expansion_contents);
-    let mut value: Option<AmountTemplate> = None;
+    let mut value: Option<models::amount::Template> = None;
     let mut cat: Option<Category> = None;
     let mut span: Option<Span> = None;
-    let mut tag: Option<TagTemplate> = None;
+    let mut tag: Option<models::tag::Template> = None;
     for sub in body.into_inner() {
         match sub.as_rule() {
             Rule::template_money_amount => {
@@ -243,14 +246,15 @@ fn validate_template<'i>(
     let tag = unwrap_or_fail!(errs, tag, "tag", loc);
     Some((
         identifier,
-        Template {
+        Template::new(
             positional,
             named,
             value,
             cat,
             span,
             tag,
-        },
+            loc,
+        ),
     ))
 }
 
@@ -302,14 +306,14 @@ fn read_arg(pair: Pair) -> (&str, Option<Arg>) {
 /// are a subset of valid float representations
 fn read_amount(item: Pair) -> Amount {
     assert_eq!(item.as_rule(), Rule::money_amount);
-    Amount(parse_amount!(item))
+    parse_amount!(item)
 }
 
 /// Parse a template item that expands to an amount
 ///
 /// May contain `@Neg`, then possibly `@Sum`, then a list of either values
 /// or argument identifiers. Grammar ensures this cannot fail.
-fn read_template_amount(pair: Pair) -> AmountTemplate {
+fn read_template_amount(pair: Pair) -> models::amount::Template {
     let (sign, pair) = match pair.as_rule() {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
@@ -318,17 +322,18 @@ fn read_template_amount(pair: Pair) -> AmountTemplate {
         Rule::builtin_sum => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
         _ => vec![pair],
     };
-    let mut sum = Vec::new();
+    use models::amount::*;
+    let mut sum = Template::new(sign);
     for item in items {
         match item.as_rule() {
             Rule::money_amount => {
-                sum.push(AmountTemplateItem::Cst(read_amount(item)));
+                sum.push(Item::Cst(read_amount(item)));
             }
-            Rule::identifier => sum.push(AmountTemplateItem::Arg(item.as_str())),
+            Rule::identifier => sum.push(Item::Arg(item.as_str())),
             _ => unreachable!(),
         }
     }
-    AmountTemplate { sign, sum }
+    sum
 }
 
 /// Parse an expense category
@@ -396,30 +401,30 @@ fn read_span(pair: Pair) -> Span {
 /// Grammar ensures this cannot fail, as raw tags are valid strings,
 /// arguments are valid identifiers, and builtin placeholders (`@Day`, `@Date`, ...)
 /// have keyword status
-fn read_template_tag(pair: Pair) -> TagTemplate {
+fn read_template_tag(pair: Pair) -> models::tag::Template {
     let concat = match pair.as_rule() {
         Rule::builtin_concat => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
         Rule::string => vec![pair],
         _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
     };
-    let mut strs = Vec::new();
-    use TagTemplateItem::*;
+    use models::tag::*;
+    let mut strs = Template::new();
     for item in concat {
         strs.push(match item.as_rule() {
-            Rule::string => Raw(item.as_str()),
-            Rule::identifier => Arg(item.as_str()),
+            Rule::string => Item::Raw(item.as_str()),
+            Rule::identifier => Item::Arg(item.as_str()),
             Rule::template_time => match item.as_str() {
-                "@Day" => Day,
-                "@Month" => Month,
-                "@Year" => Year,
-                "@Date" => Date,
-                "@Weekday" => Weekday,
+                "@Day" => Item::Day,
+                "@Month" => Item::Month,
+                "@Year" => Item::Year,
+                "@Date" => Item::Date,
+                "@Weekday" => Item::Weekday,
                 _ => unreachable!(),
             },
             _ => unreachable!(),
         });
     }
-    TagTemplate(strs)
+    strs
 }
 
 /// Parse a series of entries registered for the same year
@@ -427,7 +432,7 @@ fn read_template_tag(pair: Pair) -> TagTemplate {
 /// The inner operation (`validate_month`) can produce errors
 fn validate_year<'i>(
     path: &'i str,
-    errs: &mut ErrorRecord,
+    errs: &mut error::Record,
     year: usize,
     pairs: Vec<Pair<'i>>,
 ) -> Vec<AstItem<'i>> {
@@ -450,7 +455,7 @@ fn validate_year<'i>(
 /// produce errors
 fn validate_month<'i>(
     path: &'i str,
-    errs: &mut ErrorRecord,
+    errs: &mut error::Record,
     year: usize,
     month: Month,
     pairs: Vec<Pair<'i>>,
@@ -469,7 +474,7 @@ fn validate_month<'i>(
                 }
             }
             Err(e) => {
-                Error::new("Invalid date")
+                error::Error::new("Invalid date")
                     .with_span(&loc, "defined here")
                     .with_text(format!("{}", e))
                     .with_hint("choose a date that exists")
@@ -487,7 +492,7 @@ fn validate_month<'i>(
 /// One of the inner operations (`validate_plain_entry`) can produce errors
 fn validate_day<'i>(
     path: &'i str,
-    errs: &mut ErrorRecord,
+    errs: &mut error::Record,
     date: Date,
     pairs: Vec<Pair<'i>>,
 ) -> Vec<AstItem<'i>> {
@@ -497,8 +502,8 @@ fn validate_day<'i>(
         let loc = (path, entry.as_span().clone());
         match entry.as_rule() {
             Rule::expand_entry => {
-                let res = read_expand_entry(entry);
-                v.push(AstItem::Instance(date, loc, res));
+                let res = read_expand_entry(entry, loc);
+                v.push(AstItem::Instance(date, res));
             }
             Rule::plain_entry => {
                 let res = match validate_plain_entry(path, errs, entry) {
@@ -517,15 +522,15 @@ fn validate_day<'i>(
 ///
 /// Grammar ensures this cannot fail (but it may produce errors
 /// down the line during template expansion)
-fn read_expand_entry(pairs: Pair) -> Instance {
+fn read_expand_entry<'i>(pairs: Pair<'i>, loc: error::Loc<'i>) -> Instance<'i> {
     let (label, args) = pair!(pairs);
     let label = label.as_str();
-    let mut pos = Vec::new();
+    let mut positional = Vec::new();
     let mut named = Vec::new();
     for arg in args.into_inner() {
         match arg.as_rule() {
             Rule::money_amount | Rule::string => {
-                pos.push(read_value(arg));
+                positional.push(read_value(arg));
             }
             Rule::named_arg => {
                 let (name, value) = pair!(arg);
@@ -536,7 +541,7 @@ fn read_expand_entry(pairs: Pair) -> Instance {
             _ => unreachable!(),
         }
     }
-    Instance { label, pos, named }
+    Instance::new(label, positional, named, loc)
 }
 
 /// Parse either an amount of money or a tag
@@ -557,7 +562,7 @@ fn read_value(pair: Pair) -> Arg {
 ///
 /// This can fail since the grammar can't ensure that there is no duplicate field
 /// definition or that there is no missing field
-fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair) -> Option<Entry> {
+fn validate_plain_entry(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value: Option<Amount> = None;
     let mut cat: Option<Category> = None;
@@ -566,7 +571,7 @@ fn validate_plain_entry(path: &str, errs: &mut ErrorRecord, pair: Pair) -> Optio
     for item in pair.into_inner() {
         match item.as_rule() {
             Rule::money_amount => {
-                set_or_fail!(errs, value, Amount(parse_amount!(item)), "val", loc);
+                set_or_fail!(errs, value, parse_amount!(item), "val", loc);
             }
             Rule::expense_type => {
                 set_or_fail!(errs, cat, read_cat(item), "cat", loc);
