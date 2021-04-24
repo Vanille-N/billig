@@ -340,17 +340,7 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
 /// 
 /// Grammar ensures this cannot fail, as all categories have keyword status
 fn read_cat(pair: Pair) -> Category {
-    use entry::Category::*;
-    match pair.as_str() {
-        "Pay" => Salary,
-        "Food" => Food,
-        "Tech" => Tech,
-        "Mov" => Movement,
-        "Pro" => School,
-        "Clean" => Cleaning,
-        "Home" => Home,
-        _ => unreachable!(),
-    }
+    entry::Category::from(pair.as_str()).unwrap()
 }
 
 /// Parse a span (length, window, count)
@@ -360,26 +350,12 @@ fn read_cat(pair: Pair) -> Category {
 fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
-    let duration = match pair.next().unwrap().as_str() {
-        "Day" => Day,
-        "Week" => Week,
-        "Month" => Month,
-        "Year" => Year,
-        _ => unreachable!(),
-    };
-    use entry::Window::*;
+    let duration = entry::Duration::from(pair.next().unwrap().as_str()).unwrap();
     let window = pair
         .peek()
         .map(|it| {
             if it.as_rule() == Rule::span_window {
-                Some(match it.as_str() {
-                    "Curr" => Current,
-                    "Post" => Posterior,
-                    "Ante" => Anterior,
-                    "Pred" => Precedent,
-                    "Succ" => Successor,
-                    _ => unreachable!(),
-                })
+                Some(entry::Window::from(it.as_str()).unwrap())
             } else {
                 None
             }
@@ -389,11 +365,7 @@ fn read_span(pair: Pair) -> Span {
         pair.next();
     }
     let count = pair.next().map(|it| parse_usize!(it)).unwrap_or(1);
-    Span {
-        duration,
-        window: window.unwrap_or(Posterior),
-        count,
-    }
+    Span::from(duration, window.unwrap_or(entry::Window::Posterior), count)
 }
 
 /// Parse a template item that expands to a tag
@@ -589,10 +561,5 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, pair: Pair) -> Opt
     let cat = unwrap_or_fail!(errs, cat, "cat", loc);
     let span = unwrap_or_fail!(errs, span, "span", loc);
     let tag = unwrap_or_fail!(errs, tag, "tag", loc);
-    Some(Entry {
-        value,
-        cat,
-        span,
-        tag,
-    })
+    Some(Entry::from(value, cat, span, tag))
 }
