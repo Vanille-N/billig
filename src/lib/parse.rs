@@ -38,7 +38,7 @@ pub type Ast<'i> = Vec<AstItem<'i>>;
 #[derive(Debug)]
 pub enum AstItem<'i> {
     /// an explicit entry with its date
-    Entry(Date, Entry),
+    Entry(Entry),
     /// a template expansion with its date
     Instance(Date, Instance<'i>),
     /// a template definition
@@ -482,11 +482,11 @@ fn validate_day<'i>(
                 v.push(AstItem::Instance(date, res));
             }
             Rule::plain_entry => {
-                let res = match validate_plain_entry(path, errs, entry) {
+                let res = match validate_plain_entry(path, errs, date, entry) {
                     Some(x) => x,
                     None => continue 'pairs,
                 };
-                v.push(AstItem::Entry(date, res));
+                v.push(AstItem::Entry(res));
             }
             _ => unreachable!(),
         }
@@ -538,7 +538,7 @@ fn read_value(pair: Pair) -> Arg {
 ///
 /// This can fail since the grammar can't ensure that there is no duplicate field
 /// definition or that there is no missing field
-fn validate_plain_entry(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Entry> {
+fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value = Once::new("val", "42.69", &loc);
     let mut cat = Once::new("type", "Food", &loc);
@@ -565,5 +565,5 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, pair: Pair) -> Opt
     let cat = cat.try_get(errs)?;
     let span = span.try_get(errs)?;
     let tag = tag.try_get(errs)?;
-    Some(Entry::from(value, cat, span, tag))
+    Some(Entry::from(date, value, cat, span, tag))
 }

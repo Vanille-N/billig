@@ -9,7 +9,7 @@ fn main() {
 
 }
 
-fn read_entries(filename: &str) -> (Option<Vec<(lib::date::Date, lib::entry::Entry)>>, lib::error::Record) {
+fn read_entries(filename: &str) -> (Option<Vec<lib::entry::Entry>>, lib::error::Record) {
     let contents = std::fs::read_to_string(&filename).expect("File not found");
     let mut errs = lib::error::Record::new();
     let data = lib::parse::extract(&filename, &mut errs, &contents);

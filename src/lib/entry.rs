@@ -36,6 +36,9 @@ pub struct Entry {
     value: Amount,
     cat: Category,
     span: Span,
+    /// cached for performance
+    period: (Date, Date),
+    length: usize,
     tag: Tag,
 }
 
@@ -106,8 +109,19 @@ impl ops::Neg for Amount {
 }
 
 impl Entry {
-    pub fn from(value: Amount, cat: Category, span: Span, tag: Tag) -> Self {
-        Self { value, cat, span, tag }
+    pub fn from(date: Date, value: Amount, cat: Category, span: Span, tag: Tag) -> Self {
+        let period = span.period(date);
+        let length = period.1.index() - period.0.index() + 1;
+        Self {
+            value,
+            cat,
+            span,
+            tag,
+            period,
+            length,
+        }
+    }
+}
     }
 }
 

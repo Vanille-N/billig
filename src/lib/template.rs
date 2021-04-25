@@ -157,19 +157,19 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> Vec<(Date, Entry)> {
+pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> Vec<Entry> {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
     use ast::*;
     'ast: for item in items {
         match item {
-            Item::Entry(date, entry) => entries.push((date, entry)),
+            Item::Entry(entry) => entries.push(entry),
             Item::Template(name, body) => {
                 templates.insert(name.to_string(), body);
             }
             Item::Instance(date, instance) => {
                 match instanciate_item(errs, instance, date, &templates) {
-                    Some(inst) => entries.push((date, inst)),
+                    Some(inst) => entries.push(inst),
                     None => continue 'ast,
                 }
             }
@@ -281,7 +281,7 @@ fn perform_replacements(
             _ => (),
         }
     }
-    Some(Entry::from(value, templ.cat, templ.span, tag))
+    Some(Entry::from(date, value, templ.cat, templ.span, tag))
 }
 
 /// Expand amount
