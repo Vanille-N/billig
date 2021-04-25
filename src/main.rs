@@ -5,8 +5,11 @@ fn main() {
 
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);
-    println!("{:?}", entries);
-
+    if let Some(lst) = entries {
+        for entry in lst {
+            println!("{}", entry);
+        }
+    }
 }
 
 fn read_entries(filename: &str) -> (Option<Vec<lib::entry::Entry>>, lib::error::Record) {

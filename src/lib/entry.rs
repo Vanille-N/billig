@@ -21,7 +21,7 @@ pub struct Tag(pub String);
 
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}E", self.0 / 100, self.0 % 100)
+        write!(f, "{}.{:02}€", self.0 / 100, (self.0 % 100).abs())
     }
 }
 
@@ -122,6 +122,12 @@ impl Entry {
         }
     }
 }
+
+impl fmt::Display for Entry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let value = format!("{}", self.value);
+        let padding = std::iter::repeat(' ').take(10_usize.saturating_sub(value.len())).collect::<String>();
+        write!(f, "{}..{}: \t{}{}\t ({:?}/{})", self.period.0, self.period.1, padding, value, self.cat, self.tag)
     }
 }
 
