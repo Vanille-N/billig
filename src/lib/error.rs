@@ -222,6 +222,7 @@ impl fmt::Display for Error {
                                 '|' => write!(f, "|{}", NONE)?,
                                 '=' => write!(f, "={}", NONE)?,
                                 '^' => write!(f, "{}^", color)?,
+                                '␊' => (), // pest::errors::Error does some weird display of line endings
                                 _ => write!(f, "{}", c)?,
                             }
                         }
