@@ -3,17 +3,18 @@
 //! In fairness, this is mostly a wrapper around `pest::error::Error::new_from_span`,
 //! the difficult part of the formatting is handled and `Error` only adds aggregation
 //! of messages as well as colored output.
+//!
+//! Note that using a `Record` is the only way to produce an error
 //! 
 //! # Example
 //!
 //! ```rust
-//! Error::new("Unused argument")
+//! errs.make("Unused argument")
 //!     .nonfatal()
-//!     .with_span(inst_loc, format!("in instanciation of '{}'", inst_name))
-//!     .with_text(format!("Argument '{}' is provided but not used", arg_name))
-//!     .with_span(templ_loc, "defined here")
-//!     .with_hint("remove argument or use in template")
-//!     .register(errors);
+//!     .span(inst_loc, format!("in instanciation of '{}'", inst_name))
+//!     .text(format!("Argument '{}' is provided but not used", arg_name))
+//!     .span(templ_loc, "defined here")
+//!     .hint("remove argument or use in template")
 //! ```
 //!
 //! ```txt
@@ -51,18 +52,16 @@ pub type Loc<'i> = (&'i str, pest::Span<'i>);
 ///
 /// ```rust
 /// // NO
-/// Error::new("Fatal failure\ngeneral message\nspanning several lines\nhint to fix\nnote\nsee
+/// errs.new("Fatal failure\ngeneral message\nspanning several lines\nhint to fix\nnote\nsee
 /// documentation")
-///     .register(errors);
 ///
 /// // YES
-/// Error::new("Fatal failure")
-///     .with_text("general message")
-///     .with_text("spanning several lines")
-///     .with_hint("hint to fix")
-///     .with_hint("note")
-///     .with_text("see documentation")
-///     .register(errors);
+/// errs.make("Fatal failure")
+///     .text("general message")
+///     .text("spanning several lines")
+///     .hint("hint to fix")
+///     .hint("note")
+///     .text("see documentation")
 /// ```
 #[must_use]
 #[derive(Debug)]
@@ -71,7 +70,7 @@ pub struct Error {
     fatal: bool,
     /// name of the error
     label: String,
-    /// contents of the error
+    /// at which point of the contents is the counter
     items: Vec<Item>,
 }
 
@@ -95,14 +94,15 @@ enum Item {
 #[must_use]
 #[derive(Debug, Default)]
 pub struct Record {
-    /// how many are errors, the rest are warnings
+    /// how many are errors in the rest are warnings
+    /// counts only `contents[..contents.len()-2]`
     fatal: usize,
     contents: Vec<Error>,
 }   
 
 impl Error {
     /// Create a new error
-    pub fn new<S>(msg: S) -> Self
+    fn new<S>(msg: S) -> Self
     where S: ToString {
         Self {
             fatal: true,
@@ -112,19 +112,19 @@ impl Error {
     }
 
     /// Mark as a warning rather that a fatal error
-    pub fn nonfatal(mut self) -> Self {
+    pub fn nonfatal(&mut self) -> &mut Self {
         self.fatal = false;
         self
     }
 
     /// Add a pre-existing error (e.g. to build from a parsing error)
-    pub fn with_error(mut self, err: pest::error::Error<Rule>) -> Self {
+    pub fn from(&mut self, err: pest::error::Error<Rule>) -> &mut Self {
         self.items.push(Item::Block(err.renamed_rules(rule_rename)));
         self
     }
 
     /// Add a code block and its associated message
-    pub fn with_span<S>(mut self, loc: &Loc, msg: S) -> Self
+    pub fn span<S>(&mut self, loc: &Loc, msg: S) -> &mut Self
     where S: ToString {
         self.items.push(Item::Block(pest::error::Error::new_from_span(
             pest::error::ErrorVariant::CustomError {
@@ -136,22 +136,17 @@ impl Error {
     }
 
     /// Add an important note
-    pub fn with_text<S>(mut self, msg: S) -> Self
+    pub fn text<S>(&mut self, msg: S) -> &mut Self
     where S: ToString {
         self.items.push(Item::Text(msg.to_string()));
         self
     }
 
     /// Add a hint on how to fix
-    pub fn with_hint<S>(mut self, msg: S) -> Self
+    pub fn hint<S>(&mut self, msg: S) -> &mut Self
     where S: ToString {
         self.items.push(Item::Hint(msg.to_string()));
         self
-    }
-
-    /// Consume the error and add it to the pool of recorded errors
-    pub fn register(self, record: &mut Record) {
-        record.register(self);
     }
 }
 
@@ -163,25 +158,31 @@ impl Record {
 
     /// Checks if any of the recorded errors are fatal
     pub fn is_fatal(&self) -> bool {
-        self.fatal > 0
+        self.fatal > 0 || self.last_is_fatal()
+    }
+
+    fn last_is_fatal(&self) -> bool {
+        self.contents.last().map(|e| e.fatal).unwrap_or(false)
     }
 
     /// Number of fatal errors
     pub fn count_errors(&self) -> usize {
-        self.fatal
+        self.fatal + if self.last_is_fatal() { 1 } else { 0 }
     }
 
     /// Number of nonfatal errors
     pub fn count_warnings(&self) -> usize {
-        self.contents.len() - self.fatal
+        self.contents.len() - self.count_errors()
     }
 
     /// Add a new error to the pool
-    fn register(&mut self, err: Error) {
-        if err.fatal {
+    pub fn make<S>(&mut self, msg: S) -> &mut Error
+    where S: ToString {
+        if self.last_is_fatal() {
             self.fatal += 1;
         }
-        self.contents.push(err);
+        self.contents.push(Error::new(msg));
+        self.contents.last_mut().unwrap()
     }
 }
 
