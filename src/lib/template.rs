@@ -193,11 +193,10 @@ fn instanciate_item(
 ) -> Option<Entry> {
     let templ = match templates.get(instance.label) {
         None => {
-            error::Error::new("Undeclared template")
-                .with_span(&instance.loc, format!("attempt to instanciate {}", instance.label))
-                .with_text(format!("'{}' is not declared", instance.label))
-                .with_hint("Maybe a typo ?")
-                .register(errs);
+            errs.make("Undeclared template")
+                .span(&instance.loc, format!("attempt to instanciate {}", instance.label))
+                .text(format!("'{}' is not declared", instance.label))
+                .hint("Maybe a typo ?");
             return None;
         }
         Some(t) => t,
@@ -221,16 +220,15 @@ fn build_arguments<'i>(
     let len_inst = inst.positional.len();
     let len_templ = templ.positional.len();
     if len_inst != len_templ {
-        error::Error::new("Argcount mismatch")
-            .with_span(&inst.loc, format!("instanciation provides {} arguments", len_inst))
-            .with_span(&templ.loc, format!("template expects {} arguments", len_templ))
-            .with_text("Fix the count mismatch")
-            .with_hint(if len_inst > len_templ {
+        errs.make("Argcount mismatch")
+            .span(&inst.loc, format!("instanciation provides {} arguments", len_inst))
+            .span(&templ.loc, format!("template expects {} arguments", len_templ))
+            .text("Fix the count mismatch")
+            .hint(if len_inst > len_templ {
                 format!("remove {} arguments from instanciation", len_inst - len_templ)
             } else {
                 format!("provide the {} missing arguments", len_templ - len_inst)
-            })
-            .register(errs);
+            });
         return None;
     }
     let mut args = HashMap::new();
@@ -264,23 +262,21 @@ fn perform_replacements(
         let use_t = used_tag.contains(argname);
         match (argval, use_v, use_t) {
             (_, false, false) => {
-                error::Error::new("Unused argument")
+                errs.make("Unused argument")
                     .nonfatal()
-                    .with_span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                    .with_text(format!("Argument '{}' is provided but not used", argname))
-                    .with_span(&templ.loc, "defined here")
-                    .with_hint("remove argument or use in template")
-                    .register(errs);
+                    .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
+                    .text(format!("Argument '{}' is provided but not used", argname))
+                    .span(&templ.loc, "defined here")
+                    .hint("remove argument or use in template");
             }
             (Arg::Amount(a), false, true) => {
-                error::Error::new("Needless amount")
+                errs.make("Needless amount")
                     .nonfatal()
-                    .with_span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                    .with_text(format!("Argument '{}' has type amount but could be a string", argname))
-                    .with_span(&templ.loc, "defined here")
-                    .with_hint("argument is used only in tag field")
-                    .with_hint(format!("change to string '\"{}\"' or use in val field", a))
-                    .register(errs);
+                    .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
+                    .text(format!("Argument '{}' has type amount but could be a string", argname))
+                    .span(&templ.loc, "defined here")
+                    .hint("argument is used only in tag field")
+                    .hint(format!("change to string '\"{}\"' or use in val field", a));
             }
             _ => (),
         }
@@ -311,24 +307,22 @@ fn instantiate_amount(
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {
-                        error::Error::new("Missing argument")
-                            .with_span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                            .with_text(format!("Argument '{}' is not provided", a))
-                            .with_span(&templ.loc, "defined here")
-                            .with_hint("remove argument from template body")
-                            .with_hint(format!("or provide a default value: '{}=0'", a))
-                            .register(errs);
+                        errs.make("Missing argument")
+                            .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
+                            .text(format!("Argument '{}' is not provided", a))
+                            .span(&templ.loc, "defined here")
+                            .hint("remove argument from template body")
+                            .hint(format!("or provide a default value: '{}=0'", a));
                         return None;
                     }
                     Some(&Arg::Amount(n)) => sum += n,
                     Some(Arg::Tag(_)) => {
-                        error::Error::new("Type mismatch")
-                            .with_span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                            .with_text("Cannot treat tag as a monetary value")
-                            .with_span(&templ.loc, "defined here")
-                            .with_hint("make it a value")
-                            .with_hint("or remove from amount calculation")
-                            .register(errs);
+                        errs.make("Type mismatch")
+                            .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
+                            .text("Cannot treat tag as a monetary value")
+                            .span(&templ.loc, "defined here")
+                            .hint("make it a value")
+                            .hint("or remove from amount calculation");
                         return None;
                     }
                 }
@@ -366,13 +360,12 @@ fn instanciate_tag(
                 used.insert(a.to_string());
                 match args.get(*a) {
                     None => {
-                        error::Error::new("Missing argument")
-                            .with_span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                            .with_text(format!("Argument '{}' is not provided", a))
-                            .with_span(&templ.loc, "defined here")
-                            .with_hint("remove argument from template body")
-                            .with_hint(format!("or provide a default value: '{}=0'", a))
-                            .register(errs);
+                        errs.make("Missing argument")
+                            .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
+                            .text(format!("Argument '{}' is not provided", a))
+                            .span(&templ.loc, "defined here")
+                            .hint("remove argument from template body")
+                            .hint(format!("or provide a default value: '{}=0'", a));
                         return None;
                     }
                     Some(Arg::Amount(amount)) => tag.push_str(&amount.to_string()),

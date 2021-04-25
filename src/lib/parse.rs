@@ -66,11 +66,10 @@ impl<'i, T> Once<'i, T> {
     
     fn try_set(&mut self, val: T, errs: &mut error::Record) {
         if self.data.is_some() {
-            error::Error::new("Duplicate field definition")
-                .with_span(self.loc, format!("attempt to override {}", self.name))
-                .with_text("Each field may only be defined once")
-                .with_hint("remove one of the field definitions")
-                .register(errs);
+            errs.make("Duplicate field definition")
+                .span(self.loc, format!("attempt to override {}", self.name))
+                .text("Each field may only be defined once")
+                .hint("remove one of the field definitions");
             self.valid = false;
         }
         self.data = Some(val);
@@ -79,14 +78,13 @@ impl<'i, T> Once<'i, T> {
     fn try_get(self, errs: &mut error::Record) -> Option<T> {
         if self.valid {
             if self.data.is_none() {
-                error::Error::new("Missing field definition")
-                    .with_span(self.loc, format!("'{}' may not be omitted", self.name))
-                    .with_text("Each field must be defined once")
-                    .with_hint(format!(
+                errs.make("Missing field definition")
+                    .span(self.loc, format!("'{}' may not be omitted", self.name))
+                    .text("Each field must be defined once")
+                    .hint(format!(
                             "add definition for the missing field: '{} {}'",
                             self.name, self.hint
-                    ))
-                    .register(errs);
+                    ));
                 None
             } else {
                 self.data
@@ -109,9 +107,8 @@ pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
         Err(e) => {
-            error::Error::new("Parsing failure")
-                .with_error(e.with_path(path))
-                .register(errs);
+            errs.make("Parsing failure")
+                .from(e.with_path(path));
             return Vec::new();
         }
     };
@@ -454,12 +451,11 @@ fn validate_month<'i>(
                 }
             }
             Err(e) => {
-                error::Error::new("Invalid date")
-                    .with_span(&loc, "defined here")
-                    .with_text(format!("{}", e))
-                    .with_hint("choose a date that exists")
-                    .with_hint(e.fix_hint())
-                    .register(errs);
+                errs.make("Invalid date")
+                    .span(&loc, "defined here")
+                    .text(format!("{}", e))
+                    .hint("choose a date that exists")
+                    .hint(e.fix_hint());
                 continue 'pairs; // error does not interrupt parsing
             }
         }
