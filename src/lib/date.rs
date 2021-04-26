@@ -194,9 +194,7 @@ impl Date {
         };
         let mut n = self.year as usize * 365 + self.day as usize;
         // partially elapsed current year
-        for m in 0..self.month as usize {
-            n += [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m];
-        }
+        n += [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334][self.month as usize];
         n += leaps; // each leap year adds one day
         n
     }
