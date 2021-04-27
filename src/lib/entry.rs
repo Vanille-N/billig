@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 
 use crate::lib::date::Date;
 
@@ -182,10 +183,11 @@ impl Span {
     }
 }
 
-impl Category {
-    pub fn parse(s: &str) -> Option<Self> {
+impl FromStr for Category {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, ()> {
         use Category::*;
-        Some(match s {
+        Ok(match s {
             "Pay" => Salary,
             "Food" => Food,
             "Tech" => Tech,
@@ -193,34 +195,36 @@ impl Category {
             "Pro" => School,
             "Clean" => Cleaning,
             "Home" => Home,
-            _ => return None,
+            _ => return Err(()),
         })
     }
 }
 
-impl Duration {
-    pub fn parse(s: &str) -> Option<Self> {
+impl FromStr for Duration {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, ()> {
         use Duration::*;
-        Some(match s {
+        Ok(match s {
             "Day" => Day,
             "Week" => Week,
             "Month" => Month,
             "Year" => Year,
-            _ => return None,
+            _ => return Err(()),
         })
     }
 }
 
-impl Window {
-    pub fn parse(s: &str) -> Option<Self> {
+impl FromStr for Window {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, ()> {
         use Window::*;
-        Some(match s {
+        Ok(match s {
             "Curr" => Current,
             "Post" => Posterior,
             "Ante" => Anterior,
             "Pred" => Precedent,
             "Succ" => Successor,
-            _ => return None,
+            _ => return Err(()),
         })
     }
 }

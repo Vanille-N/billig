@@ -10,6 +10,7 @@
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::fmt;
+use std::str::FromStr;
 
 /// A date with day-precision
 ///
@@ -47,18 +48,11 @@ pub enum Month {
     Dec,
 }
 
-impl Month {
-    /// Parse a month from its stringified name (`"Jan"`, `"Feb"`, `"Mar"`, ...)
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the string is not a valid 3-character month name.
-    ///
-    /// It is meant to translate text matched by the grammar, not validate arbitrary
-    /// user input.
-    pub fn parse(s: &str) -> Option<Self> {
+impl FromStr for Month {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, ()> {
         use Month::*;
-        Some(match s {
+        Ok(match s {
             "Jan" => Jan,
             "Feb" => Feb,
             "Mar" => Mar,
@@ -71,10 +65,12 @@ impl Month {
             "Oct" => Oct,
             "Nov" => Nov,
             "Dec" => Dec,
-            _ => return None,
+            _ => return Err(()),
         })
     }
+}
 
+impl Month {
     /// Month directly succeeding the current one with wrapping
     pub fn next(self) -> Self {
         Self::from_isize((self as isize + 1) % 12).unwrap()
