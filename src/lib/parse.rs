@@ -345,7 +345,7 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
 /// 
 /// Grammar ensures this cannot fail, as all categories have keyword status
 fn read_cat(pair: Pair) -> Category {
-    entry::Category::from(pair.as_str()).unwrap()
+    entry::Category::parse(pair.as_str()).unwrap()
 }
 
 /// Parse a span (length, window, count)
@@ -355,12 +355,12 @@ fn read_cat(pair: Pair) -> Category {
 fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
     use entry::Duration::*;
-    let duration = entry::Duration::from(pair.next().unwrap().as_str()).unwrap();
+    let duration = entry::Duration::parse(pair.next().unwrap().as_str()).unwrap();
     let window = pair
         .peek()
         .map(|it| {
             if it.as_rule() == Rule::span_window {
-                Some(entry::Window::from(it.as_str()).unwrap())
+                Some(entry::Window::parse(it.as_str()).unwrap())
             } else {
                 None
             }
@@ -417,7 +417,7 @@ fn validate_year<'i>(
     for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
         let (month, rest) = decapitate!(pair);
-        let month = Month::from(month.as_str()); // validated by the grammar
+        let month = Month::parse(month.as_str()).unwrap(); // validated by the grammar
         let items = validate_month(path, errs, year, month, rest.collect::<Vec<_>>());
         for item in items {
             v.push(item);

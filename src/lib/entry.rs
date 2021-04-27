@@ -183,7 +183,7 @@ impl Span {
 }
 
 impl Category {
-    pub fn from(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         use Category::*;
         Some(match s {
             "Pay" => Salary,
@@ -199,7 +199,7 @@ impl Category {
 }
 
 impl Duration {
-    pub fn from(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         use Duration::*;
         Some(match s {
             "Day" => Day,
@@ -212,7 +212,7 @@ impl Duration {
 }
 
 impl Window {
-    pub fn from(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         use Window::*;
         Some(match s {
             "Curr" => Current,

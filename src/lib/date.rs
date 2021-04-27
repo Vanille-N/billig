@@ -56,9 +56,9 @@ impl Month {
     ///
     /// It is meant to translate text matched by the grammar, not validate arbitrary
     /// user input.
-    pub fn from(s: &str) -> Self {
+    pub fn parse(s: &str) -> Option<Self> {
         use Month::*;
-        match s {
+        Some(match s {
             "Jan" => Jan,
             "Feb" => Feb,
             "Mar" => Mar,
@@ -71,8 +71,8 @@ impl Month {
             "Oct" => Oct,
             "Nov" => Nov,
             "Dec" => Dec,
-            _ => unreachable!(),
-        }
+            _ => return None,
+        })
     }
 
     /// Month directly succeeding the current one with wrapping
