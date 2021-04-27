@@ -36,7 +36,6 @@ impl fmt::Display for Tag {
 pub struct Entry {
     value: Amount,
     cat: Category,
-    span: Span,
     /// cached for performance
     period: (Date, Date),
     length: usize,
@@ -116,11 +115,32 @@ impl Entry {
         Self {
             value,
             cat,
-            span,
             tag,
             period,
             length,
         }
+    }
+
+    pub fn intersect(self, period: (Date, Date)) -> Option<Self> {
+        let start = period.0.max(self.period.0);
+        let end = period.1.min(self.period.1);
+        if start > end { return None; }
+        let idx_old = (self.period.0.index() as isize);
+        let idx_new = (start.index(), end.index());
+        let before_end = self.value.0 * (idx_new.1 as isize + 1 - idx_old) / self.length as isize;
+        let before_start = self.value.0 * (idx_new.0 as isize - idx_old) / self.length as isize;
+        #[cfg(test)]
+        {
+            println!("Truncating {}..{} to {}..{}", self.period.0.index(), self.period.1.index(), idx_new.0, idx_new.1);
+            println!("    {} -> {} - {}", self.value.0, before_end, before_start);
+        }
+        Some(Self {
+            value: Amount(before_end - before_start),
+            period: (start, end),
+            length: idx_new.1 - idx_new.0,
+            ..self
+        })
+            
     }
 }
 
