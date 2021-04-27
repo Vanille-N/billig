@@ -335,4 +335,20 @@ mod test {
         check!(dt!(2020-Dec-31), span!(Year<Precedent>10), dt!(2010-Jan-1), dt!(2019-Dec-31));
         check!(dt!(2020-Dec-31), span!(Year<Anterior>10), dt!(2011-Jan-1), dt!(2020-Dec-31));
     }
+
+    macro_rules! bogus {
+        ( $val:expr, $start:expr, $end:expr ) => {{
+            let value = Amount($val);
+            let start = $start;
+            let end = $end;
+            Entry {
+                value,
+                cat: Category::Food,
+                tag: Tag(String::new()),
+                period: (start, end),
+                length: end.index() - start.index() + 1,
+            }
+        }}
+    }
+
 }
