@@ -148,7 +148,7 @@ impl Entry {
         Some(Self {
             value: Amount(before_end - before_start),
             period: (start, end),
-            length: idx_new.1 - idx_new.0,
+            length: idx_new.1 - idx_new.0 + 1,
             ..self
         })
             
@@ -349,6 +349,18 @@ mod test {
                 length: end.index() - start.index() + 1,
             }
         }}
+    }
+
+    #[test]
+    fn intersections() {
+        assert_eq!(bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31)).intersect((dt!(2021-Feb-1), dt!(2021-Feb-15))).unwrap().value, Amount(15));
+        {
+            let entry = bogus!(1763, dt!(2020-Mar-13), dt!(2020-Sep-27));
+            let sections = vec![dt!(2020-Mar-13), dt!(2020-Apr-5), dt!(2020-Jun-30), dt!(2020-Sep-28)];
+            let splits = sections.windows(2)
+                .map(|w| entry.clone().intersect((w[0], w[1].prev())).unwrap());
+            assert_eq!(entry.value, splits.map(|e| e.value).sum())
+        }
     }
 
 }
