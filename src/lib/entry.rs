@@ -14,7 +14,7 @@ pub mod fields {
     };
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Amount(isize);
 
 #[derive(Debug, Clone)]
@@ -105,6 +105,17 @@ impl ops::Neg for Amount {
     type Output = Self;
     fn neg(self) -> Self {
         Self(-self.0)
+    }
+}
+
+impl std::iter::Sum for Amount {
+    fn sum<I>(iter: I) -> Self
+    where I: Iterator<Item = Self> {
+        let mut sum = Amount(0);
+        for x in iter {
+            sum += x;
+        }
+        sum
     }
 }
 
