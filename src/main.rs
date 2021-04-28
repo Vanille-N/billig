@@ -8,12 +8,15 @@ fn main() {
     println!("{}", errs);
     if let Some(lst) = entries {
         let period = (Date::from(2020, Month::Dec, 12).unwrap(), Date::from(2021, Month::Apr, 5).unwrap());
+        let mut summary = lib::summary::Summary::new_period(period);
         use lib::date::{Date, Month};
         for entry in lst {
+            summary += entry.clone();
             if let Some(e) = entry.intersect(period) {
                 println!("{}", e);
             }
         }
+        println!("{:?}", summary);
     }
 }
 

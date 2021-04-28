@@ -1,6 +1,8 @@
 use std::fmt;
 use std::str::FromStr;
 
+use num_traits::FromPrimitive;
+use num_derive::FromPrimitive;
 
 use crate::lib::date::{Date, Period};
 
@@ -37,22 +39,23 @@ impl fmt::Display for Tag {
 pub struct Entry {
     value: Amount,
     cat: Category,
-    /// cached for performance
-    period: (Date, Date),
+    period: Period,
+    /// cached length of the period for performance
     length: usize,
-    tag: Tag,
+    tag: Option<Tag>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, FromPrimitive)]
 pub enum Category {
-    School,
+    School = 0,
     Food,
-    Home,
+    Home, 
     Salary,
     Tech,
     Movement,
     Cleaning,
 }
+pub const CATEGORY_COUNT: usize = 7;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Span {
@@ -127,7 +130,7 @@ impl Entry {
         Self {
             value,
             cat,
-            tag,
+            tag: Some(tag),
             period,
             length,
         }
@@ -137,7 +140,7 @@ impl Entry {
         let start = period.0.max(self.period.0);
         let end = period.1.min(self.period.1);
         if start > end { return None; }
-        let idx_old = (self.period.0.index() as isize);
+        let idx_old = self.period.0.index() as isize;
         let idx_new = (start.index(), end.index());
         let before_end = self.value.0 * (idx_new.1 as isize + 1 - idx_old) / self.length as isize;
         let before_start = self.value.0 * (idx_new.0 as isize - idx_old) / self.length as isize;
@@ -150,9 +153,26 @@ impl Entry {
             value: Amount(before_end - before_start),
             period: (start, end),
             length: idx_new.1 - idx_new.0 + 1,
-            ..self
-        })
-            
+            tag: None,
+            cat: self.cat,
+        }) 
+    }
+
+    pub fn intersect(mut self, period: Period) -> Option<Self> {
+        let tag = self.tag.take();
+        self.intersect_loss(period)
+            .map(|mut entry| {
+                entry.tag = tag;
+                entry
+            })
+    }
+
+    pub fn value(&self) -> Amount {
+        self.value
+    }
+
+    pub fn category(&self) -> Category {
+        self.cat
     }
 }
 
@@ -160,7 +180,11 @@ impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = format!("{}", self.value);
         let padding = std::iter::repeat(' ').take(10_usize.saturating_sub(value.len())).collect::<String>();
-        write!(f, "{}..{}: \t{}{}\t ({:?}/{})", self.period.0, self.period.1, padding, value, self.cat, self.tag)
+        write!(f, "{}..{}: \t{}{}\t ({:?}", self.period.0, self.period.1, padding, value, self.cat)?;
+        if let Some(t) = &self.tag {
+            write!(f, "/{}", t.0)?;
+        }
+        write!(f, ")")
     }
 }
 
@@ -272,6 +296,14 @@ mod test {
         Month::*,
         Date,
     };
+
+    #[test]
+    fn count_categories() {
+        for i in 0..CATEGORY_COUNT {
+            assert!(Category::from_usize(i).is_some());
+        }
+        assert!(Category::from_usize(CATEGORY_COUNT).is_none());
+    }
         
     macro_rules! dt {
         ( $y:tt - $m:tt - $d:tt ) => {
@@ -345,7 +377,7 @@ mod test {
             Entry {
                 value,
                 cat: Category::Food,
-                tag: Tag(String::new()),
+                tag: None,
                 period: (start, end),
                 length: end.index() - start.index() + 1,
             }
