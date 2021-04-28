@@ -46,3 +46,19 @@ impl ops::AddAssign<&Entry> for Summary {
 }
 
 
+/// A collection of summaries
+#[derive(Debug)]
+pub struct Calendar {
+    /// 
+    /// Assumption : any two adjacent summaries can be compared in the sense
+    /// ```
+    /// let lhs = items[idx].period;
+    /// let rhs = items[idx+1].period;
+    /// assert!(lhs.0 <= rhs.0);
+    /// assert!(lhs.1 <= rhs.1);
+    /// ```
+    /// In practice this is guaranteed by the fact that no constructor
+    /// provides a way of creating a `Calendar` for which the summaries
+    /// are not of disjoint periods.
+    items: Vec<Summary>,
+}
