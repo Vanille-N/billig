@@ -62,3 +62,38 @@ pub struct Calendar {
     /// are not of disjoint periods.
     items: Vec<Summary>,
 }
+
+impl Calendar {
+    /// Construct from an _increasing_ iterator of dates
+    pub fn from_iter<I>(mut splits: I) -> Self
+    where I: Iterator<Item = Date> {
+        let mut items = Vec::new();
+        let mut start = splits.next();
+        while let Some(a) = start {
+            let end = splits.next();
+            assert!(start <= end);
+            if let Some(b) = end {
+                items.push(Summary::new_period((a, b)));
+            }
+            start = end;
+        }
+        Self {
+            items,
+        }
+    }
+
+    pub fn from_step<F>(mut start: Date, step: F) -> Self
+    where F: Fn(Date) -> Option<Date> {
+        let mut items = Vec::new();
+        while let Some(end) = step(start) {
+            assert!(start <= end);
+            items.push(Summary::new_period((start, end)));
+            start = end;
+        }
+        Self {
+            items,
+        }
+    }
+}
+        
+
