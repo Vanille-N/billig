@@ -88,7 +88,13 @@ impl Month {
         match self {
             Jan | Mar | May | Jul | Aug | Oct | Dec => 31,
             Apr | Jun | Sep | Nov => 30,
-            Feb => if is_leap(year) { 29 } else { 28 },
+            Feb => {
+                if is_leap(year) {
+                    29
+                } else {
+                    28
+                }
+            }
         }
     }
 }
@@ -150,7 +156,11 @@ impl Date {
         } else if day == 0 || day > 31 {
             Err(DateError::InvalidDay(day))
         } else if day <= month.count(year as u16) as usize {
-            Ok(Self { year: year as u16, month, day: day as u8 })
+            Ok(Self {
+                year: year as u16,
+                month,
+                day: day as u8,
+            })
         } else if day >= 30 {
             Err(DateError::MonthTooShort(month, day))
         } else {
@@ -187,7 +197,7 @@ impl Date {
                 self.year as usize
             };
             // count leap years before current
-            (years / 4) - (years / 100) + (years / 400) 
+            (years / 4) - (years / 100) + (years / 400)
         };
         let mut n = self.year as usize * 365 + self.day as usize;
         // partially elapsed current year
@@ -205,28 +215,49 @@ impl Date {
     pub fn next(self) -> Self {
         if self.month.count(self.year) == self.day {
             if self.month == Month::Dec {
-                Self { year: self.year + 1, month: Month::Jan, day: 1 }
+                Self {
+                    year: self.year + 1,
+                    month: Month::Jan,
+                    day: 1,
+                }
             } else {
-                Self { month: self.month.next(), day: 1, ..self }
+                Self {
+                    month: self.month.next(),
+                    day: 1,
+                    ..self
+                }
             }
         } else {
-            Self { day: self.day + 1, ..self }
+            Self {
+                day: self.day + 1,
+                ..self
+            }
         }
     }
 
     pub fn prev(self) -> Self {
         if self.day == 1 {
             if self.month == Month::Jan {
-                Self { year: self.year - 1, month: Month::Dec, day: 31 }
+                Self {
+                    year: self.year - 1,
+                    month: Month::Dec,
+                    day: 31,
+                }
             } else {
                 let month = self.month.prev();
-                Self { month, day: month.count(self.year), ..self }
+                Self {
+                    month,
+                    day: month.count(self.year),
+                    ..self
+                }
             }
         } else {
-            Self { day: self.day - 1, ..self }
+            Self {
+                day: self.day - 1,
+                ..self
+            }
         }
     }
-
 
     /// `count` days before/after current date
     pub fn jump_day(self, count: isize) -> Self {
@@ -303,7 +334,11 @@ impl Date {
     pub fn jump_year(self, count: isize) -> Self {
         let year = (self.year as isize + count) as u16;
         if self.month == Month::Feb && self.day == 29 && !is_leap(year) {
-            Self { year, day: 28, ..self }
+            Self {
+                year,
+                day: 28,
+                ..self
+            }
         } else {
             Self { year, ..self }
         }
@@ -313,27 +348,38 @@ impl Date {
     pub fn start_of_month(self) -> Self {
         Self { day: 1, ..self }
     }
-    
+
     /// Get date of the last day of the current month
     pub fn end_of_month(self) -> Self {
-        Self { day: self.month.count(self.year), ..self }
+        Self {
+            day: self.month.count(self.year),
+            ..self
+        }
     }
 
     /// Jan 1st of the current year
     pub fn start_of_year(self) -> Self {
-        Self { day: 1, month: Month::Jan, ..self }
+        Self {
+            day: 1,
+            month: Month::Jan,
+            ..self
+        }
     }
 
     /// Dec 31st of the current year
     pub fn end_of_year(self) -> Self {
-        Self { day: 31, month: Month::Dec, ..self }
+        Self {
+            day: 31,
+            month: Month::Dec,
+            ..self
+        }
     }
-    
+
     /// First Monday before the current date
     pub fn start_of_week(self) -> Self {
         self.jump_day(-(self.weekday() as isize))
     }
-    
+
     /// First Sunday after the current date
     pub fn end_of_week(self) -> Self {
         self.jump_day(6 - self.weekday() as isize)
@@ -348,7 +394,6 @@ impl Date {
         self
     }
 }
-
 
 fn is_leap(year: u16) -> bool {
     if year % 400 == 0 {
@@ -366,11 +411,9 @@ impl fmt::Display for DateError {
         match self {
             UnsupportedYear(y) => write!(f, "{} is outside of the supported range for years", y),
             NotBissextile(y) => write!(f, "{} is not bissextile, Feb 29 does not exist", y),
-            MonthTooShort(m, d) => write!(
-                f,
-                "{} is a short month, it does not have a {}th day",
-                m, d,
-            ),
+            MonthTooShort(m, d) => {
+                write!(f, "{} is a short month, it does not have a {}th day", m, d,)
+            }
             InvalidDay(d) => write!(f, "{} is not a valid day", d),
         }
     }
@@ -383,7 +426,9 @@ impl DateError {
         match self {
             UnsupportedYear(_) => "year should be between 1000 and 9999 inclusive".to_string(),
             NotBissextile(y) => format!("did you mean {y}-Feb-28 or {y}-Mar-01 ?", y = y),
-            MonthTooShort(m, d) => format!("{} is only {} days long", m,
+            MonthTooShort(m, d) => format!(
+                "{} is only {} days long",
+                m,
                 if m == Month::Feb { 28.max(d - 1) } else { 30 }
             ),
             InvalidDay(d) => format!("{} is not in the range 1 ..= 31", d),
@@ -392,20 +437,21 @@ impl DateError {
 }
 
 #[cfg(test)]
+#[rustfmt::skip]
 mod test {
-    use super::{
-        *,
-        Month::*,
-        Weekday::*,
-    };
+    use super::{Month::*, Weekday::*, *};
 
     #[test]
     fn bissextile_check() {
         macro_rules! yes {
-            ( $y:expr ) => { assert!(is_leap($y)); }
+            ( $y:expr ) => {
+                assert!(is_leap($y));
+            };
         }
         macro_rules! no {
-            ( $y:expr ) => { assert!(!is_leap($y)); }
+            ( $y:expr ) => {
+                assert!(!is_leap($y));
+            };
         }
         yes!(2004);
         no!(2100);
@@ -417,25 +463,35 @@ mod test {
 
     macro_rules! ok {
         ( $y:tt - $m:tt - $d:tt ) => {
-            assert_eq!(Date::from($y, $m, $d), Ok(Date { year: $y, month: $m, day: $d }));
-        }
+            assert_eq!(
+                Date::from($y, $m, $d),
+                Ok(Date {
+                    year: $y,
+                    month: $m,
+                    day: $d
+                })
+            );
+        };
     }
     macro_rules! short {
         ( $y:tt - $m:tt - $d:tt ) => {
-            assert_eq!(Date::from($y, $m, $d), Err(DateError::MonthTooShort($m, $d)));
-        }
+            assert_eq!(
+                Date::from($y, $m, $d),
+                Err(DateError::MonthTooShort($m, $d))
+            );
+        };
     }
     macro_rules! nbiss {
         ( $y:tt - $m:tt - $d:tt ) => {
             assert_eq!(Date::from($y, $m, $d), Err(DateError::NotBissextile($y)));
-        }
+        };
     }
     macro_rules! invalid {
         ( $y:tt - $m:tt - $d:tt ) => {
             assert_eq!(Date::from($y, $m, $d), Err(DateError::InvalidDay($d)));
-        }
+        };
     }
-    
+
     #[test]
     fn long_months() {
         ok!(2020-Jan-31);
@@ -475,13 +531,13 @@ mod test {
     macro_rules! dt {
         ( $y:tt - $m:tt - $d:tt ) => {
             Date::from($y, $m, $d).unwrap()
-        }
+        };
     }
-    
+
     macro_rules! day {
         ( $d:expr => $w:expr ) => {
             assert_eq!($d.weekday(), $w)
-        }
+        };
     }
     #[test]
     fn weekday_references() {
@@ -561,7 +617,7 @@ mod test {
         ( $d1:expr, $d2:expr ) => {{
             assert_eq!($d1.jump_day(1), $d2);
             assert_eq!($d2.jump_day(-1), $d1);
-        }}
+        }};
     }
     macro_rules! jmonth {
         ( $d1:expr, $n:expr, <->, $d2:expr ) => {{
@@ -574,7 +630,6 @@ mod test {
         ( $d1:expr, $n:expr, <-, $d2:expr ) => {{
             assert_eq!($d2.jump_month(-$n), $d1);
         }};
-
     }
     macro_rules! jyear {
         ( $d1:expr, $n:expr, <->, $d2:expr ) => {{

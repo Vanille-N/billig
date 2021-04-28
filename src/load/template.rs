@@ -9,31 +9,21 @@ use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
     date::Date,
-    entry::{Entry, fields::{self, Span, Category}},
+    entry::{
+        fields::{self, Category, Span},
+        Entry,
+    },
 };
-use crate::load::{
-    parse::ast,
-    error,
-};
+use crate::load::{error, parse::ast};
 
 /// Convenient exports
 pub mod models {
-    pub use super::{
-        Template,
-        Arg,
-        Instance,
-    };
+    pub use super::{Arg, Instance, Template};
     pub mod tag {
-        pub use super::super::{
-            Tag as Template,
-            TagItem as Item,
-        };
+        pub use super::super::{Tag as Template, TagItem as Item};
     }
     pub mod amount {
-        pub use super::super::{
-            Amount as Template,
-            AmountItem as Item,
-        };
+        pub use super::super::{Amount as Template, AmountItem as Item};
     }
 }
 
@@ -118,14 +108,40 @@ pub enum AmountItem<'i> {
 }
 
 impl<'i> Instance<'i> {
-    pub fn new(label: &'i str, positional: Vec<Arg<'i>>, named: Vec<(&'i str, Arg<'i>)>, loc: error::Loc<'i>) -> Self {
-        Self { label, positional, named, loc }
+    pub fn new(
+        label: &'i str,
+        positional: Vec<Arg<'i>>,
+        named: Vec<(&'i str, Arg<'i>)>,
+        loc: error::Loc<'i>,
+    ) -> Self {
+        Self {
+            label,
+            positional,
+            named,
+            loc,
+        }
     }
 }
 
 impl<'i> Template<'i> {
-    pub fn new(positional: Vec<&'i str>, named: Vec<(&'i str, Arg<'i>)>, value: Amount<'i>, cat: Category, span: Span, tag: Tag<'i>, loc: error::Loc<'i>) -> Self {
-        Self { positional, named, value, cat, span, tag, loc }
+    pub fn new(
+        positional: Vec<&'i str>,
+        named: Vec<(&'i str, Arg<'i>)>,
+        value: Amount<'i>,
+        cat: Category,
+        span: Span,
+        tag: Tag<'i>,
+        loc: error::Loc<'i>,
+    ) -> Self {
+        Self {
+            positional,
+            named,
+            value,
+            cat,
+            span,
+            tag,
+            loc,
+        }
     }
 }
 
@@ -196,7 +212,10 @@ fn instanciate_item(
     let templ = match templates.get(instance.label) {
         None => {
             errs.make("Undeclared template")
-                .span(&instance.loc, format!("attempt to instanciate {}", instance.label))
+                .span(
+                    &instance.loc,
+                    format!("attempt to instanciate {}", instance.label),
+                )
                 .text(format!("'{}' is not declared", instance.label))
                 .hint("Maybe a typo ?");
             return None;
@@ -223,11 +242,20 @@ fn build_arguments<'i>(
     let len_templ = templ.positional.len();
     if len_inst != len_templ {
         errs.make("Argcount mismatch")
-            .span(&inst.loc, format!("instanciation provides {} arguments", len_inst))
-            .span(&templ.loc, format!("template expects {} arguments", len_templ))
+            .span(
+                &inst.loc,
+                format!("instanciation provides {} arguments", len_inst),
+            )
+            .span(
+                &templ.loc,
+                format!("template expects {} arguments", len_templ),
+            )
             .text("Fix the count mismatch")
             .hint(if len_inst > len_templ {
-                format!("remove {} arguments from instanciation", len_inst - len_templ)
+                format!(
+                    "remove {} arguments from instanciation",
+                    len_inst - len_templ
+                )
             } else {
                 format!("provide the {} missing arguments", len_templ - len_inst)
             });
@@ -275,7 +303,10 @@ fn perform_replacements(
                 errs.make("Needless amount")
                     .nonfatal()
                     .span(&inst.loc, format!("in instanciation of '{}'", inst.label))
-                    .text(format!("Argument '{}' has type amount but could be a string", argname))
+                    .text(format!(
+                        "Argument '{}' has type amount but could be a string",
+                        argname
+                    ))
                     .span(&templ.loc, "defined here")
                     .hint("argument is used only in tag field")
                     .hint(format!("change to string '\"{}\"' or use in val field", a));

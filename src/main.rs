@@ -3,18 +3,24 @@ mod load;
 
 use lib::{
     date::{Date, Month},
-    entry::{Span, Duration, Window},
+    entry::{Duration, Span, Window},
     summary::Summary,
 };
 
 fn main() {
-    let filename = std::env::args().nth(1).unwrap_or_else(|| "../expenses.bil".to_string());
+    let filename = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "../expenses.bil".to_string());
 
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
-        let period = (Date::from(2020, Month::Dec, 12).unwrap(), Date::from(2021, Month::Apr, 5).unwrap());
-        let whole = Span::from(Duration::Year, Window::Posterior, 1).period(Date::from(2020, Month::Sep, 1).unwrap());
+        let period = (
+            Date::from(2020, Month::Dec, 12).unwrap(),
+            Date::from(2021, Month::Apr, 5).unwrap(),
+        );
+        let whole = Span::from(Duration::Year, Window::Posterior, 1)
+            .period(Date::from(2020, Month::Sep, 1).unwrap());
         let mut summary = Summary::new_period(period);
         let mut whole = Summary::new_period(whole);
         for entry in lst {
@@ -36,8 +42,8 @@ fn read_entries(filename: &str) -> (Option<Vec<lib::entry::Entry>>, load::error:
     if errs.is_fatal() {
         return (None, errs);
     }
-    let pairs = load::template::instanciate(&mut errs, data);  
-    if errs.is_fatal()  {
+    let pairs = load::template::instanciate(&mut errs, data);
+    if errs.is_fatal() {
         (None, errs)
     } else {
         (Some(pairs), errs)

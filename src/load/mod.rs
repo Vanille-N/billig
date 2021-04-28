@@ -1,3 +1,3 @@
-pub mod template;
-pub mod parse;
 pub mod error;
+pub mod parse;
+pub mod template;

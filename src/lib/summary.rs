@@ -2,7 +2,7 @@ use std::ops;
 
 use crate::lib::{
     date::{Date, Period},
-    entry::{Category, Amount, Entry, CATEGORY_COUNT},
+    entry::{Amount, Category, Entry, CATEGORY_COUNT},
 };
 
 #[derive(Debug, Clone)]
@@ -45,11 +45,10 @@ impl ops::AddAssign<&Entry> for Summary {
     }
 }
 
-
 /// A collection of summaries
 #[derive(Debug)]
 pub struct Calendar {
-    /// 
+    ///
     /// Assumption : any two adjacent summaries can be compared in the sense
     /// ```
     /// let lhs = items[idx].period;
@@ -66,7 +65,9 @@ pub struct Calendar {
 impl Calendar {
     /// Construct from an _increasing_ iterator of dates
     pub fn from_iter<I>(mut splits: I) -> Self
-    where I: Iterator<Item = Date> {
+    where
+        I: Iterator<Item = Date>,
+    {
         let mut items = Vec::new();
         let mut start = splits.next();
         while let Some(a) = start {
@@ -77,23 +78,19 @@ impl Calendar {
             }
             start = end;
         }
-        Self {
-            items,
-        }
+        Self { items }
     }
 
     pub fn from_step<F>(mut start: Date, step: F) -> Self
-    where F: Fn(Date) -> Option<Date> {
+    where
+        F: Fn(Date) -> Option<Date>,
+    {
         let mut items = Vec::new();
         while let Some(end) = step(start) {
             assert!(start <= end);
             items.push(Summary::new_period((start, end)));
             start = end;
         }
-        Self {
-            items,
-        }
+        Self { items }
     }
 }
-        
-

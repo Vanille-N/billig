@@ -17,15 +17,12 @@ use crate::lib::{
 };
 use crate::load::{
     error,
-    template::models::{self, Arg, Template, Instance},
+    template::models::{self, Arg, Instance, Template},
 };
 
 /// Convenient exports
 pub mod ast {
-    pub use super::{
-        Ast,
-        AstItem as Item
-    };
+    pub use super::{Ast, AstItem as Item};
 }
 
 /// Pest-generated parser
@@ -61,11 +58,11 @@ impl<'i, T> Once<'i, T> {
             name,
             hint,
             loc,
-            valid: true, 
+            valid: true,
             data: None,
         }
     }
-    
+
     fn try_set(&mut self, val: T, errs: &mut error::Record) {
         if self.data.is_some() {
             errs.make("Duplicate field definition")
@@ -84,8 +81,8 @@ impl<'i, T> Once<'i, T> {
                     .span(self.loc, format!("'{}' may not be omitted", self.name))
                     .text("Each field must be defined once")
                     .hint(format!(
-                            "add definition for the missing field: '{} {}'",
-                            self.name, self.hint
+                        "add definition for the missing field: '{} {}'",
+                        self.name, self.hint
                     ));
                 None
             } else {
@@ -109,8 +106,7 @@ pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
         Err(e) => {
-            errs.make("Parsing failure")
-                .from(e.with_path(path));
+            errs.make("Parsing failure").from(e.with_path(path));
             return Vec::new();
         }
     };
@@ -175,8 +171,6 @@ macro_rules! parse_amount {
         Amount::from(($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize)
     };
 }
-
-
 
 /// Check all items
 ///
@@ -252,15 +246,7 @@ fn validate_template<'i>(
     let tag = tag.try_get(errs)?;
     Some((
         identifier,
-        Template::new(
-            positional,
-            named,
-            value,
-            cat,
-            span,
-            tag,
-            loc,
-        ),
+        Template::new(positional, named, value, cat, span, tag, loc),
     ))
 }
 
@@ -343,19 +329,24 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
 }
 
 /// Parse an expense category
-/// 
+///
 /// Grammar ensures this cannot fail, as all categories have keyword status
 fn read_cat(pair: Pair) -> Category {
     pair.as_str().parse::<entry::Category>().unwrap()
 }
 
 /// Parse a span (length, window, count)
-/// 
+///
 /// Grammar ensures this cannot fail, as lengths and windows are keywords,
 /// and counts are a subset of valid unsigned integers
 fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
-    let duration = pair.next().unwrap().as_str().parse::<entry::Duration>().unwrap();
+    let duration = pair
+        .next()
+        .unwrap()
+        .as_str()
+        .parse::<entry::Duration>()
+        .unwrap();
     let window = pair
         .peek()
         .map(|it| {
@@ -405,7 +396,7 @@ fn read_template_tag(pair: Pair) -> models::tag::Template {
 }
 
 /// Parse a series of entries registered for the same year
-/// 
+///
 /// The inner operation (`validate_month`) can produce errors
 fn validate_year<'i>(
     path: &'i str,
@@ -538,7 +529,12 @@ fn read_value(pair: Pair) -> Arg {
 ///
 /// This can fail since the grammar can't ensure that there is no duplicate field
 /// definition or that there is no missing field
-fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: Pair) -> Option<Entry> {
+fn validate_plain_entry(
+    path: &str,
+    errs: &mut error::Record,
+    date: Date,
+    pair: Pair,
+) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value = Once::new("val", "42.69", &loc);
     let mut cat = Once::new("type", "Food", &loc);

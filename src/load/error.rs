@@ -5,7 +5,7 @@
 //! of messages as well as colored output.
 //!
 //! Note that using a `Record` is the only way to produce an error
-//! 
+//!
 //! # Example
 //!
 //! ```rust
@@ -85,7 +85,6 @@ enum Item {
     Hint(String),
 }
 
-
 /// A collection of errors
 ///
 /// Typically to keep record of all errors detected in one file,
@@ -98,12 +97,14 @@ pub struct Record {
     /// counts only `contents[..contents.len()-2]`
     fatal: usize,
     contents: Vec<Error>,
-}   
+}
 
 impl Error {
     /// Create a new error
     fn new<S>(msg: S) -> Self
-    where S: ToString {
+    where
+        S: ToString,
+    {
         Self {
             fatal: true,
             label: msg.to_string(),
@@ -125,26 +126,35 @@ impl Error {
 
     /// Add a code block and its associated message
     pub fn span<S>(&mut self, loc: &Loc, msg: S) -> &mut Self
-    where S: ToString {
-        self.items.push(Item::Block(pest::error::Error::new_from_span(
-            pest::error::ErrorVariant::CustomError {
-                message: msg.to_string(),
-            },
-            loc.1.clone(),
-        ).with_path(&loc.0.to_string())));
+    where
+        S: ToString,
+    {
+        self.items.push(Item::Block(
+            pest::error::Error::new_from_span(
+                pest::error::ErrorVariant::CustomError {
+                    message: msg.to_string(),
+                },
+                loc.1.clone(),
+            )
+            .with_path(&loc.0.to_string()),
+        ));
         self
     }
 
     /// Add an important note
     pub fn text<S>(&mut self, msg: S) -> &mut Self
-    where S: ToString {
+    where
+        S: ToString,
+    {
         self.items.push(Item::Text(msg.to_string()));
         self
     }
 
     /// Add a hint on how to fix
     pub fn hint<S>(&mut self, msg: S) -> &mut Self
-    where S: ToString {
+    where
+        S: ToString,
+    {
         self.items.push(Item::Hint(msg.to_string()));
         self
     }
@@ -177,7 +187,9 @@ impl Record {
 
     /// Add a new error to the pool
     pub fn make<S>(&mut self, msg: S) -> &mut Error
-    where S: ToString {
+    where
+        S: ToString,
+    {
         if self.last_is_fatal() {
             self.fatal += 1;
         }
@@ -185,7 +197,6 @@ impl Record {
         self.contents.last_mut().unwrap()
     }
 }
-
 
 const RED: &str = "\x1b[0;91;1m";
 const YELLOW: &str = "\x1b[0;93;1m";
@@ -200,7 +211,7 @@ impl fmt::Display for Error {
             (RED, "--> Error")
         } else {
             (YELLOW, "--> Warning")
-        }; 
+        };
         writeln!(f, "{}{}:{} {}{}", color, header, WHITE, self.label, NONE)?;
         for item in &self.items {
             match item {
@@ -208,7 +219,13 @@ impl fmt::Display for Error {
                     let mut align = "   ".to_string();
                     let mut align_found = false;
                     for line in format!("{}", err).split('\n') {
-                        write!(f, " {}|{}  {}", color, if align_found { &align } else { "" }, BLUE)?;
+                        write!(
+                            f,
+                            " {}|{}  {}",
+                            color,
+                            if align_found { &align } else { "" },
+                            BLUE
+                        )?;
                         for c in line.chars() {
                             match c {
                                 '-' if !align_found => {
@@ -247,10 +264,19 @@ impl fmt::Display for Record {
             return Ok(());
         }
         let fatal = self.is_fatal();
-        let count = if fatal { self.count_errors() } else { self.count_warnings() };
+        let count = if fatal {
+            self.count_errors()
+        } else {
+            self.count_warnings()
+        };
         let color = if fatal { RED } else { YELLOW };
         let trunc = 10;
-        for err in self.contents.iter().filter(|err| err.fatal == fatal).take(trunc) {
+        for err in self
+            .contents
+            .iter()
+            .filter(|err| err.fatal == fatal)
+            .take(trunc)
+        {
             // only print errors with the maximum fatality
             writeln!(f, "{}", err)?;
         }
@@ -259,14 +285,21 @@ impl fmt::Display for Record {
         }
         let plural = if count > 1 { "s" } else { "" };
         if fatal {
-            writeln!(f, "{}Fatal: {}{} error{} emitted{}", color, WHITE, count, plural, NONE)?;
+            writeln!(
+                f,
+                "{}Fatal: {}{} error{} emitted{}",
+                color, WHITE, count, plural, NONE
+            )?;
         } else {
-            writeln!(f, "{}Nonfatal: {}{} warning{} emitted{}", color, WHITE, count, plural, NONE)?;
+            writeln!(
+                f,
+                "{}Nonfatal: {}{} warning{} emitted{}",
+                color, WHITE, count, plural, NONE
+            )?;
         }
         Ok(())
     }
 }
-
 
 /// Convert rule names to user-friendly information about their purpose
 fn rule_rename(rule: &Rule) -> String {
@@ -301,7 +334,7 @@ fn rule_rename(rule: &Rule) -> String {
         named_arg => "a name=value named argument pair",
         arguments => "a sequence of whitespace-separated argument instances",
         expand_entry => "a template expansion",
-        plain_entry => "an entry composed of field descriptors", 
+        plain_entry => "an entry composed of field descriptors",
         entry => "an explicit entry or a template expansion",
         entries_day => "a sequence of entries for the same day",
         entries_month => "a sequence of entries for the same month",
@@ -328,4 +361,3 @@ fn rule_rename(rule: &Rule) -> String {
         program => "a sequence of template descriptions or sequences of entries",
     })
 }
-
