@@ -185,7 +185,6 @@ macro_rules! parse_amount {
 pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -> Ast<'i> {
     let mut ast = Vec::new();
     'pairs: for pair in pairs {
-        let loc = (path, pair.as_span().clone());
         match pair.as_rule() {
             Rule::template_descriptor => {
                 let (name, templ) = match validate_template(path, errs, pair) {
@@ -356,7 +355,6 @@ fn read_cat(pair: Pair) -> Category {
 /// and counts are a subset of valid unsigned integers
 fn read_span(pair: Pair) -> Span {
     let mut pair = pair.into_inner().into_iter().peekable();
-    use entry::Duration::*;
     let duration = pair.next().unwrap().as_str().parse::<entry::Duration>().unwrap();
     let window = pair
         .peek()

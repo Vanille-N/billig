@@ -2,7 +2,7 @@ mod lib;
 mod load;
 
 use lib::{
-    date::{Date, Month, Period},
+    date::{Date, Month},
     entry::{Span, Duration, Window},
     summary::Summary,
 };

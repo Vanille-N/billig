@@ -1,7 +1,6 @@
 use std::fmt;
 use std::str::FromStr;
 
-use num_traits::FromPrimitive;
 use num_derive::FromPrimitive;
 
 use crate::lib::date::{Date, Period};
