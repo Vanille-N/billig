@@ -33,3 +33,16 @@ impl Summary {
         self.total
     }
 }
+
+impl ops::AddAssign<Entry> for Summary {
+    fn add_assign(&mut self, entry: Entry) {
+        if let Some(entry) = entry.intersect(self.period) {
+            let idx = entry.category() as usize;
+            let add = entry.value();
+            self.categories[idx] += add;
+            self.total += add;
+        }
+    }
+}
+
+
