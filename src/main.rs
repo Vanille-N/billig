@@ -1,6 +1,12 @@
 mod lib;
 mod load;
 
+use lib::{
+    date::{Date, Month, Period},
+    entry::{Span, Duration, Window},
+    summary::Summary,
+};
+
 fn main() {
     let filename = std::env::args().nth(1).unwrap_or_else(|| "../expenses.bil".to_string());
 
@@ -8,15 +14,18 @@ fn main() {
     println!("{}", errs);
     if let Some(lst) = entries {
         let period = (Date::from(2020, Month::Dec, 12).unwrap(), Date::from(2021, Month::Apr, 5).unwrap());
-        let mut summary = lib::summary::Summary::new_period(period);
-        use lib::date::{Date, Month};
+        let whole = Span::from(Duration::Year, Window::Posterior, 1).period(Date::from(2020, Month::Sep, 1).unwrap());
+        let mut summary = Summary::new_period(period);
+        let mut whole = Summary::new_period(whole);
         for entry in lst {
-            summary += entry.clone();
+            summary += &entry;
+            whole += &entry;
             if let Some(e) = entry.intersect(period) {
                 println!("{}", e);
             }
         }
         println!("{:?}", summary);
+        println!("{:?}", whole);
     }
 }
 
