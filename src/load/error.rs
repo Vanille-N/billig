@@ -37,7 +37,7 @@
 //!  |      ? hint: remove argument or use in template
 //! ```
 
-use crate::lib::parse::Rule;
+use crate::load::parse::Rule;
 
 /// Location of an error
 ///

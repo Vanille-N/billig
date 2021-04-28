@@ -14,6 +14,8 @@ type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 use crate::lib::{
     date::{Date, Month},
     entry::{self, Amount, Category, Entry, Span, Tag},
+};
+use crate::load::{
     error,
     template::models::{self, Arg, Template, Instance},
 };

@@ -8,10 +8,12 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
+    date::Date,
+    entry::{Entry, fields::{self, Span, Category}},
+};
+use crate::load::{
     parse::ast,
     error,
-    entry::{Entry, fields::{self, Span, Category}},
-    date::Date,
 };
 
 /// Convenient exports

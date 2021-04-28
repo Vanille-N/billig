@@ -1,4 +1,5 @@
 mod lib;
+mod load;
 
 fn main() {
     let filename = std::env::args().nth(1).unwrap_or_else(|| "../expenses.bil".to_string());
@@ -15,14 +16,14 @@ fn main() {
     }
 }
 
-fn read_entries(filename: &str) -> (Option<Vec<lib::entry::Entry>>, lib::error::Record) {
+fn read_entries(filename: &str) -> (Option<Vec<lib::entry::Entry>>, load::error::Record) {
     let contents = std::fs::read_to_string(&filename).expect("File not found");
-    let mut errs = lib::error::Record::new();
-    let data = lib::parse::extract(&filename, &mut errs, &contents);
+    let mut errs = load::error::Record::new();
+    let data = load::parse::extract(&filename, &mut errs, &contents);
     if errs.is_fatal() {
         return (None, errs);
     }
-    let pairs = lib::template::instanciate(&mut errs, data);  
+    let pairs = load::template::instanciate(&mut errs, data);  
     if errs.is_fatal()  {
         (None, errs)
     } else {
