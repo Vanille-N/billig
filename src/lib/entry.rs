@@ -1,7 +1,8 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::lib::date::Date;
+
+use crate::lib::date::{Date, Period};
 
 pub mod fields {
     pub use super::{
@@ -132,7 +133,7 @@ impl Entry {
         }
     }
 
-    pub fn intersect(self, period: (Date, Date)) -> Option<Self> {
+    pub fn intersect_loss(&self, period: Period) -> Option<Self> {
         let start = period.0.max(self.period.0);
         let end = period.1.min(self.period.1);
         if start > end { return None; }
@@ -168,7 +169,7 @@ impl Span {
         Self { duration, window, count }
     }
 
-    pub fn period(&self, dt: Date) -> (Date, Date) {
+    pub fn period(&self, dt: Date) -> Period {
         use Duration::*;
         use Window::*;
         let nb = self.count as isize;

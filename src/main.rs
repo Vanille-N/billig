@@ -7,9 +7,10 @@ fn main() {
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
+        let period = (Date::from(2020, Month::Dec, 12).unwrap(), Date::from(2021, Month::Apr, 5).unwrap());
         use lib::date::{Date, Month};
         for entry in lst {
-            if let Some(e) = entry.intersect((Date::from(2020, Month::Dec, 12).unwrap(), Date::from(2021, Month::Apr, 5).unwrap())) {
+            if let Some(e) = entry.intersect(period) {
                 println!("{}", e);
             }
         }
