@@ -2,7 +2,7 @@ use std::ops;
 
 use crate::lib::{
     date::{Date, Period},
-    entry::{Amount, Category, Entry, CATEGORY_COUNT},
+    entry::{Amount, Category, Entry, Duration, CATEGORY_COUNT},
 };
 
 #[derive(Debug, Clone)]
@@ -45,20 +45,9 @@ impl ops::AddAssign<&Entry> for Summary {
     }
 }
 
-/// A collection of summaries
+/// A collection of disjoint ordered summaries
 #[derive(Debug)]
 pub struct Calendar {
-    ///
-    /// Assumption : any two adjacent summaries can be compared in the sense
-    /// ```
-    /// let lhs = items[idx].period;
-    /// let rhs = items[idx+1].period;
-    /// assert!(lhs.0 <= rhs.0);
-    /// assert!(lhs.1 <= rhs.1);
-    /// ```
-    /// In practice this is guaranteed by the fact that no constructor
-    /// provides a way of creating a `Calendar` for which the summaries
-    /// are not of disjoint periods.
     items: Vec<Summary>,
 }
 
@@ -72,25 +61,45 @@ impl Calendar {
         let mut start = splits.next();
         while let Some(a) = start {
             let end = splits.next();
-            assert!(start <= end);
             if let Some(b) = end {
-                items.push(Summary::new_period((a, b)));
+                assert!(start < end);
+                items.push(Summary::new_period((a, b.prev())));
             }
             start = end;
         }
         Self { items }
     }
 
+    /// Construct from a starting point and a step function
     pub fn from_step<F>(mut start: Date, step: F) -> Self
     where
         F: Fn(Date) -> Option<Date>,
     {
         let mut items = Vec::new();
         while let Some(end) = step(start) {
-            assert!(start <= end);
-            items.push(Summary::new_period((start, end)));
+            assert!(start < end);
+            items.push(Summary::new_period((start, end.prev())));
             start = end;
         }
         Self { items }
+    }
+
+    pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
+        Self::from_step(
+            period.0,
+            |date| {
+                let next = match duration {
+                    Duration::Day => date.jump_day(count as isize),
+                    Duration::Week => date.jump_day(count as isize * 7),
+                    Duration::Month => date.jump_month(count as isize),
+                    Duration::Year => date.jump_year(count as isize),
+                };
+                if next <= period.1 {
+                    Some(next)
+                } else {
+                    None
+                }
+            },
+        )
     }
 }

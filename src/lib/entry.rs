@@ -299,6 +299,7 @@ impl FromStr for Window {
 #[cfg(test)]
 #[rustfmt::skip]
 mod test {
+    use num_traits::FromPrimitive;
     use super::{Duration::*, Window::*, *};
     use crate::lib::date::{Date, Month::*};
 
