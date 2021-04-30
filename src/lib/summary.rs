@@ -178,3 +178,17 @@ mod test {
         assert_eq!(idx, cal.items.len() - 1);
         let (_, idx, _) = query!(cal, dt!(2021-Jan-1));
         assert_eq!(idx, cal.items.len() - 1);
+        // period
+        let ans = cal.dichotomy((dt!(2019-Jun-10), dt!(2019-Jun-15)));
+        assert_eq!(ans.len(), 0);
+        let ans = cal.dichotomy((dt!(2021-Jun-10), dt!(2021-Jun-15)));
+        assert_eq!(ans.len(), 0);
+        let ans = cal.dichotomy((dt!(2019-Jun-10), dt!(2021-Jun-15)));
+        assert_eq!(ans.len(), cal.items.len());
+        let ans = cal.dichotomy((dt!(2020-Jan-20), dt!(2020-Mar-18)));
+        assert!(ans[0].period.0 <= dt!(2020-Jan-20));
+        assert!(ans[0].period.1 >= dt!(2020-Jan-20));
+        assert!(ans[ans.len() - 1].period.0 <= dt!(2020-Mar-18));
+        assert!(ans[ans.len() - 1].period.1 >= dt!(2020-Mar-18));
+    }
+}
