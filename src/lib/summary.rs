@@ -169,3 +169,12 @@ mod test {
         assert!(start.0 <= date && date <= start.1);
         let (date, _, start) = query!(cal, dt!(2020-Jan-7));
         assert!(start.0 <= date && date <= start.1);
+        // extremities
+        let (_, idx, _) = query!(cal, dt!(2020-Jan-1));
+        assert_eq!(idx, 0);
+        let (_, idx, _) = query!(cal, dt!(2019-Dec-31));
+        assert_eq!(idx, 0);
+        let (_, idx, _) = query!(cal, dt!(2020-Dec-31));
+        assert_eq!(idx, cal.items.len() - 1);
+        let (_, idx, _) = query!(cal, dt!(2021-Jan-1));
+        assert_eq!(idx, cal.items.len() - 1);
