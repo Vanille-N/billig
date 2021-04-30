@@ -128,3 +128,29 @@ impl Calendar {
         }
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::lib::{
+        date::{Date, Month::*},
+        entry::Duration::*,
+    };
+
+    macro_rules! dt {
+        ( $y:tt - $m:tt - $d:tt ) => {{
+            Date::from($y, $m, $d).unwrap()
+        }}
+    }
+
+    macro_rules! query {
+        ( $cal:expr, $date:expr ) => {{
+            let date = $date;
+            let len = $cal.items.len();
+            let idx = $cal.dichotomy_aux(date, 0, len);
+            let start = &$cal.items[idx];
+            (date, idx, start.period)
+        }}
+    }
+
