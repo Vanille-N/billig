@@ -154,3 +154,18 @@ mod test {
         }}
     }
 
+    #[test]
+    fn dichotomies() {
+        let cal = Calendar::from_spacing((dt!(2020-Jan-1), dt!(2020-Dec-31)), Duration::Week, 1);
+        println!("{:?}", cal);
+        // middle
+        let (date, _, start) = query!(cal, dt!(2020-Feb-5));
+        assert!(start.0 <= date && date <= start.1);
+        let (date, _, start) = query!(cal, dt!(2020-Mar-7));
+        assert!(start.0 <= date && date <= start.1);
+        let (date, _, start) = query!(cal, dt!(2020-Feb-4));
+        assert!(start.0 <= date && date <= start.1);
+        let (date, _, start) = query!(cal, dt!(2020-Nov-15));
+        assert!(start.0 <= date && date <= start.1);
+        let (date, _, start) = query!(cal, dt!(2020-Jan-7));
+        assert!(start.0 <= date && date <= start.1);
