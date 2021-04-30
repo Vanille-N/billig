@@ -149,6 +149,18 @@ pub enum DateError {
 }
 
 impl Date {
+    const MAX: Self = Self {
+        year: 9999,
+        month: Month::Dec,
+        day: 31,
+    };
+
+    const MIN: Self = Self {
+        year: 1000,
+        month: Month::Jan,
+        day: 1,
+    };
+
     /// Validate year-month-day into date
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
         if !(1000..=9999).contains(&year) {
