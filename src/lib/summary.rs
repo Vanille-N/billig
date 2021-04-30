@@ -103,31 +103,21 @@ impl Calendar {
         )
     }
     
-    /// Find last index that starts before `target`
+    /// Find index that contains `target`
     ///
     /// `start` is large, `end` is strict
-    fn dichotomy_start(&self, target: Date, start: usize, end: usize) -> usize {
+    fn dichotomy_aux(&self, target: Date, start: usize, end: usize) -> usize {
         if start + 1 >= end {
             return start;
         }
         let mid = (start + end) / 2;
-        if self.items[mid].period.0 < target {
-            self.dichotomy_start(target, start, mid)
+        if self.items[mid].period.0 > target {
+            self.dichotomy_aux(target, start, mid)
         } else {
-            self.dichotomy_start(target, mid, end)
+            self.dichotomy_aux(target, mid, end)
         }
     }
 
-    /// Find first index that ends after target `target`
-    ///
-    /// `start` is large, `end` is strict
-    fn dichotomy_end(&self, target: Date, start: usize, end: usize) -> usize {
-        if start + 1 >= end {
-            return start;
-        }
-        let mid = (start + end) / 2;
-        if self.items[mid].period.1 > target {
-            self.dichotomy_end(target, mid, end)
         } else {
             self.dichotomy_end(target, start, mid)
         }
