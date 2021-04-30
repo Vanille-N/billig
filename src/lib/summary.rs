@@ -118,8 +118,13 @@ impl Calendar {
         }
     }
 
+    fn dichotomy(&self, period: Period) -> &[Summary] {
+        let start = self.dichotomy_aux(period.0, 0, self.items.len());
+        let end = self.dichotomy_aux(period.1, 0, self.items.len());
+        if start <= end && self.items[end].period.0 <= period.1 && self.items[end].period.1 >= period.0 {
+            &self.items[start..=end]
         } else {
-            self.dichotomy_end(target, start, mid)
+            &self.items[0..0]
         }
     }
 }
