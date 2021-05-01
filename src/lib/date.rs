@@ -24,7 +24,9 @@ pub struct Date {
     month: Month,
     day: u8,
 }
-pub type Period = (Date, Date);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Period(pub Date, pub Date);
 
 impl fmt::Display for Date {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

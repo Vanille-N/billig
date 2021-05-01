@@ -153,7 +153,7 @@ impl Entry {
         }
         Some(Self {
             value: Amount(before_end - before_start),
-            period: (start, end),
+            period: Period(start, end),
             length: idx_new.1 - idx_new.0 + 1,
             tag: None,
             cat: self.cat,
@@ -212,7 +212,7 @@ impl Span {
         use Duration::*;
         use Window::*;
         let nb = self.count as isize;
-        match (self.duration, self.window) {
+        let (start, end) = match (self.duration, self.window) {
             (Day, Precedent) => (dt.jump_day(-nb), dt.prev()),
             (Day, Successor) => (dt.next(), dt.jump_day(nb)),
             (Day, Anterior) => (dt.jump_day(-nb).next(), dt),
@@ -250,7 +250,8 @@ impl Span {
                 let d = dt.start_of_year();
                 (d.jump_year(-nb), d.prev())
             }
-        }
+        };
+        Period(start, end)
     }
 }
 
@@ -332,7 +333,7 @@ mod test {
 
     macro_rules! check {
         ( $date:expr, $span:expr, $start:expr, $end:expr ) => {
-            assert_eq!($span.period($date), ($start, $end));
+            assert_eq!($span.period($date), Period($start, $end));
         };
     }
 
@@ -523,7 +524,7 @@ mod test {
                 value,
                 cat: Category::Food,
                 tag: None,
-                period: (start, end),
+                period: Period(start, end),
                 length: end.index() - start.index() + 1,
             }
         }};
@@ -533,7 +534,7 @@ mod test {
     fn intersections() {
         assert_eq!(
             bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31))
-                .intersect((dt!(2021-Feb-1), dt!(2021-Feb-15)))
+                .intersect(Period(dt!(2021-Feb-1), dt!(2021-Feb-15)))
                 .unwrap()
                 .value,
             Amount(15)
@@ -548,7 +549,7 @@ mod test {
             ];
             let splits = sections
                 .windows(2)
-                .map(|w| entry.clone().intersect((w[0], w[1].prev())).unwrap());
+                .map(|w| entry.clone().intersect(Period(w[0], w[1].prev())).unwrap());
             assert_eq!(entry.value, splits.map(|e| e.value).sum())
         }
     }

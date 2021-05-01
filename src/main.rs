@@ -2,7 +2,7 @@ mod lib;
 mod load;
 
 use lib::{
-    date::{Date, Month},
+    date::{Date, Month, Period},
     entry::{Duration, Span, Window},
     summary::Calendar,
 };
@@ -15,7 +15,7 @@ fn main() {
     let (entries, errs) = read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
-        let period = (
+        let period = Period(
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2021, Month::Mar, 1).unwrap(),
         );

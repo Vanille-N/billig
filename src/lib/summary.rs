@@ -13,7 +13,7 @@ pub struct Summary {
 }
 
 impl Summary {
-    pub fn new_period(period: Period) -> Self {
+    pub fn from_period(period: Period) -> Self {
         Self {
             period,
             total: Amount::from(0),
@@ -21,8 +21,8 @@ impl Summary {
         }
     }
 
-    pub fn new_date(date: Date) -> Self {
-        Self::new_period((date, date))
+    pub fn from_date(date: Date) -> Self {
+        Self::from_period(Period(date, date))
     }
 
     pub fn query(&self, cat: Category) -> Amount {
@@ -63,7 +63,7 @@ impl Calendar {
             let end = splits.next();
             if let Some(b) = end {
                 assert!(start < end);
-                items.push(Summary::new_period((a, b.prev())));
+                items.push(Summary::from_period(Period(a, b.prev())));
             }
             start = end;
         }
@@ -78,7 +78,7 @@ impl Calendar {
         let mut items = Vec::new();
         while let Some(end) = step(start) {
             assert!(start < end);
-            items.push(Summary::new_period((start, end.prev())));
+            items.push(Summary::from_period(Period(start, end.prev())));
             start = end;
         }
         Self { items }
@@ -165,7 +165,7 @@ mod test {
 
     #[test]
     fn dichotomies() {
-        let cal = Calendar::from_spacing((dt!(2020-Jan-1), dt!(2020-Dec-31)), Duration::Week, 1);
+        let cal = Calendar::from_spacing(Period(dt!(2020-Jan-1), dt!(2020-Dec-31)), Duration::Week, 1);
         println!("{:?}", cal);
         // middle
         let (date, _, start) = query!(cal, dt!(2020-Feb-5));
@@ -188,13 +188,13 @@ mod test {
         let (_, idx, _) = query!(cal, dt!(2021-Jan-1));
         assert_eq!(idx, cal.items.len() - 1);
         // period
-        let ans = cal.dichotomy((dt!(2019-Jun-10), dt!(2019-Jun-15)));
+        let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2019-Jun-15)));
         assert_eq!(ans.len(), 0);
-        let ans = cal.dichotomy((dt!(2021-Jun-10), dt!(2021-Jun-15)));
+        let ans = cal.dichotomy(Period(dt!(2021-Jun-10), dt!(2021-Jun-15)));
         assert_eq!(ans.len(), 0);
-        let ans = cal.dichotomy((dt!(2019-Jun-10), dt!(2021-Jun-15)));
+        let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2021-Jun-15)));
         assert_eq!(ans.len(), cal.items.len());
-        let ans = cal.dichotomy((dt!(2020-Jan-20), dt!(2020-Mar-18)));
+        let ans = cal.dichotomy(Period(dt!(2020-Jan-20), dt!(2020-Mar-18)));
         assert!(ans[0].period.0 <= dt!(2020-Jan-20));
         assert!(ans[0].period.1 >= dt!(2020-Jan-20));
         assert!(ans[ans.len() - 1].period.0 <= dt!(2020-Mar-18));
