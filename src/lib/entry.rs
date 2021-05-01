@@ -175,6 +175,10 @@ impl Entry {
     pub fn category(&self) -> Category {
         self.cat
     }
+
+    pub fn period(&self) -> Period {
+        self.period
+    }
 }
 
 impl fmt::Display for Entry {

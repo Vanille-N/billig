@@ -118,13 +118,22 @@ impl Calendar {
         }
     }
 
-    fn dichotomy(&self, period: Period) -> &[Summary] {
+    fn dichotomy(&mut self, period: Period) -> &mut [Summary] {
         let start = self.dichotomy_aux(period.0, 0, self.items.len());
         let end = self.dichotomy_aux(period.1, 0, self.items.len());
         if start <= end && self.items[end].period.0 <= period.1 && self.items[end].period.1 >= period.0 {
-            &self.items[start..=end]
+            &mut self.items[start..=end]
         } else {
-            &self.items[0..0]
+            &mut self.items[0..0]
+        }
+    }
+
+    pub fn register(&mut self, items: &[Entry]) {
+        for item in items {
+            let range = self.dichotomy(item.period());
+            for summary in range {
+                *summary += item;
+            }
         }
     }
 }

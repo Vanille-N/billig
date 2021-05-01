@@ -4,7 +4,7 @@ mod load;
 use lib::{
     date::{Date, Month},
     entry::{Duration, Span, Window},
-    summary::Summary,
+    summary::Calendar,
 };
 
 fn main() {
@@ -16,22 +16,15 @@ fn main() {
     println!("{}", errs);
     if let Some(lst) = entries {
         let period = (
-            Date::from(2020, Month::Dec, 12).unwrap(),
-            Date::from(2021, Month::Apr, 5).unwrap(),
+            Date::from(2020, Month::Sep, 1).unwrap(),
+            Date::from(2021, Month::Mar, 1).unwrap(),
         );
-        let whole = Span::from(Duration::Year, Window::Posterior, 1)
-            .period(Date::from(2020, Month::Sep, 1).unwrap());
-        let mut summary = Summary::new_period(period);
-        let mut whole = Summary::new_period(whole);
-        for entry in lst {
-            summary += &entry;
-            whole += &entry;
-            if let Some(e) = entry.intersect(period) {
-                println!("{}", e);
-            }
+        let mut calendar = Calendar::from_spacing(period, Duration::Month, 1);
+        calendar.register(&lst);
+        for entry in &lst {
+            println!("{}", entry);
         }
-        println!("{:?}", summary);
-        println!("{:?}", whole);
+        println!("{:?}", calendar);
     }
 }
 
