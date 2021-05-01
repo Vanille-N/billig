@@ -420,7 +420,7 @@ fn is_leap(year: u16) -> bool {
 }
 
 impl fmt::Display for DateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use DateError::*;
         match self {
             UnsupportedYear(y) => write!(f, "{} is outside of the supported range for years", y),
@@ -447,6 +447,67 @@ impl DateError {
             ),
             InvalidDay(d) => format!("{} is not in the range 1 ..= 31", d),
         }
+    }
+}
+
+impl fmt::Display for Period {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut merge_day = |f: &mut fmt::Formatter| {
+            if self.0.day == 1 && self.1.day == self.1.month.count(self.1.year) {
+                Ok(())
+            } else if self.0.day == self.1.day {
+                write!(f, "-{}", self.0.day)
+            } else {
+                write!(f, "-{}..{}", self.0.day, self.1.day)
+            }
+        };
+        let mut shorten_month = |f: &mut fmt::Formatter| {
+            write!(f, "-{}", self.0.month)?;
+            if self.0.day != 1 {
+                write!(f, "-{}", self.0.day)?;
+            }
+            write!(f, "..{}", self.1.month)?;
+            if self.1.day != self.1.month.count(self.1.year) {
+                write!(f, "-{}", self.1.day)?;
+            }
+            Ok(())
+        };
+        let mut shorten_year = |f: &mut fmt::Formatter| {
+            write!(f, "{}", self.0.year)?;
+            if self.0.month != Month::Jan || self.0.day != 1 {
+                write!(f, "-{}", self.0.month)?;
+                if self.0.day != 1 {
+                    write!(f, "-{}", self.0.day)?;
+                }
+            }
+            write!(f, "..{}", self.1.year)?;
+            if self.1.month != Month::Dec || self.1.day != 31 {
+                write!(f, "-{}", self.1.month)?;
+                if self.1.day != self.1.month.count(self.1.year) {
+                    write!(f, "-{}", self.1.day)?;
+                }
+            }
+            Ok(())
+        };
+        let mut merge_month = |f: &mut fmt::Formatter| {
+            if self.0.month == Month::Jan && self.1.month == Month::Dec {
+                Ok(())
+            } else if self.0.month == self.1.month {
+                write!(f, "-{}", self.0.month)?;
+                merge_day(f)
+            } else {
+                shorten_month(f)
+            }
+        };
+        let mut merge_year = |f: &mut fmt::Formatter| {
+            if self.0.year == self.1.year {
+                write!(f, "{}", self.0.year)?;
+                merge_month(f)
+            } else {
+                shorten_year(f)
+            }
+        };
+        merge_year(f)
     }
 }
 
@@ -710,5 +771,30 @@ mod test {
         day!(dt!(2000-Jan-5) => Wed);
         assert_eq!(dt!(2000-Jan-5).start_of_week(), dt!(2000-Jan-3));
         assert_eq!(dt!(2000-Jan-5).end_of_week(), dt!(2000-Jan-9));
+    }
+
+    macro_rules! pp {
+        ( $start:expr, $end:expr => $fmt:expr ) => {{
+            assert_eq!(&format!("{}", Period($start, $end)), $fmt);
+        }}
+    }
+
+    #[test]
+    fn period_fmt() {
+        pp!(dt!(2020-Jan-15), dt!(2021-Mar-17) => "2020-Jan-15..2021-Mar-17");
+        pp!(dt!(2020-Jan-15), dt!(2020-Mar-17) => "2020-Jan-15..Mar-17");
+        pp!(dt!(2020-Jan-15), dt!(2020-Jan-17) => "2020-Jan-15..17");
+        pp!(dt!(2020-Jan-15), dt!(2020-Jan-15) => "2020-Jan-15");
+        pp!(dt!(2020-Jan-1), dt!(2020-Jan-31) => "2020-Jan");
+        pp!(dt!(2020-Jan-1), dt!(2020-Jan-15) => "2020-Jan-1..15");
+        pp!(dt!(2020-Jan-15), dt!(2020-Jan-31) => "2020-Jan-15..31");
+        pp!(dt!(2020-Jan-1), dt!(2020-Feb-15) => "2020-Jan..Feb-15");
+        pp!(dt!(2020-Jan-1), dt!(2020-Feb-29) => "2020-Jan..Feb");
+        pp!(dt!(2020-Jan-1), dt!(2021-Mar-17) => "2020..2021-Mar-17");
+        pp!(dt!(2020-Feb-3), dt!(2021-Dec-31) => "2020-Feb-3..2021");
+        pp!(dt!(2020-Jan-1), dt!(2021-Mar-31) => "2020..2021-Mar");
+        pp!(dt!(2020-Jan-1), dt!(2020-Dec-31) => "2020");
+        pp!(dt!(2020-Jan-1), dt!(2023-Dec-31) => "2020..2023");
+        pp!(dt!(2020-Jan-3), dt!(2023-Feb-28) => "2020-Jan-3..2023-Feb");
     }
 }
