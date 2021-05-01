@@ -2,7 +2,7 @@ use std::ops;
 
 use crate::lib::{
     date::{Date, Period},
-    entry::{Amount, Category, Entry, Duration, CATEGORY_COUNT},
+    entry::{Amount, Category, Duration, Entry, CATEGORY_COUNT},
 };
 
 #[derive(Debug, Clone)]
@@ -85,24 +85,21 @@ impl Calendar {
     }
 
     pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
-        Self::from_step(
-            period.0,
-            |date| {
-                let next = match duration {
-                    Duration::Day => date.jump_day(count as isize),
-                    Duration::Week => date.jump_day(count as isize * 7),
-                    Duration::Month => date.jump_month(count as isize),
-                    Duration::Year => date.jump_year(count as isize),
-                };
-                if next <= period.1 {
-                    Some(next)
-                } else {
-                    None
-                }
-            },
-        )
+        Self::from_step(period.0, |date| {
+            let next = match duration {
+                Duration::Day => date.jump_day(count as isize),
+                Duration::Week => date.jump_day(count as isize * 7),
+                Duration::Month => date.jump_month(count as isize),
+                Duration::Year => date.jump_year(count as isize),
+            };
+            if next <= period.1 {
+                Some(next)
+            } else {
+                None
+            }
+        })
     }
-    
+
     /// Find index that contains `target`
     ///
     /// `start` is large, `end` is strict
@@ -121,7 +118,10 @@ impl Calendar {
     fn dichotomy_idx(&self, period: Period) -> (usize, usize) {
         let start = self.dichotomy_aux(period.0, 0, self.items.len());
         let end = self.dichotomy_aux(period.1, 0, self.items.len());
-        if start <= end && self.items[end].period.0 <= period.1 && self.items[end].period.1 >= period.0 {
+        if start <= end
+            && self.items[end].period.0 <= period.1
+            && self.items[end].period.1 >= period.0
+        {
             (start, end)
         } else {
             (1, 0)
@@ -148,7 +148,7 @@ impl Calendar {
     }
 }
 
-
+#[rustfmt::skip]
 #[cfg(test)]
 mod test {
     use super::*;

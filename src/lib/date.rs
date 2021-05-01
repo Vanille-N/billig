@@ -452,7 +452,7 @@ impl DateError {
 
 impl fmt::Display for Period {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut merge_day = |f: &mut fmt::Formatter| {
+        let merge_day = |f: &mut fmt::Formatter| {
             if self.0.day == 1 && self.1.day == self.1.month.count(self.1.year) {
                 Ok(())
             } else if self.0.day == self.1.day {
@@ -461,7 +461,7 @@ impl fmt::Display for Period {
                 write!(f, "-{}..{}", self.0.day, self.1.day)
             }
         };
-        let mut shorten_month = |f: &mut fmt::Formatter| {
+        let shorten_month = |f: &mut fmt::Formatter| {
             write!(f, "-{}", self.0.month)?;
             if self.0.day != 1 {
                 write!(f, "-{}", self.0.day)?;
@@ -472,7 +472,7 @@ impl fmt::Display for Period {
             }
             Ok(())
         };
-        let mut shorten_year = |f: &mut fmt::Formatter| {
+        let shorten_year = |f: &mut fmt::Formatter| {
             write!(f, "{}", self.0.year)?;
             if self.0.month != Month::Jan || self.0.day != 1 {
                 write!(f, "-{}", self.0.month)?;
@@ -489,7 +489,7 @@ impl fmt::Display for Period {
             }
             Ok(())
         };
-        let mut merge_month = |f: &mut fmt::Formatter| {
+        let merge_month = |f: &mut fmt::Formatter| {
             if self.0.month == Month::Jan && self.1.month == Month::Dec {
                 Ok(())
             } else if self.0.month == self.1.month {
@@ -499,7 +499,7 @@ impl fmt::Display for Period {
                 shorten_month(f)
             }
         };
-        let mut merge_year = |f: &mut fmt::Formatter| {
+        let merge_year = |f: &mut fmt::Formatter| {
             if self.0.year == self.1.year {
                 write!(f, "{}", self.0.year)?;
                 merge_month(f)

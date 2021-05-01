@@ -3,7 +3,7 @@ mod load;
 
 use lib::{
     date::{Date, Month, Period},
-    entry::{Duration, Span, Window},
+    entry::Duration,
     summary::Calendar,
 };
 
