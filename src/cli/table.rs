@@ -117,18 +117,49 @@ impl fmt::Display for Table<'_> {
 
 impl fmt::Display for GridFmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // upper border
+        write!(f, "{}", ULCORNER)?;
+        self.labels.hline(f)?;
+        for c in &self.columns {
+            write!(f, "{}", LOJOIN)?;
+            c.hline(f)?;
+        }
+        writeln!(f, "{}", URCORNER)?;
+        // title line
+        write!(f, "{}", VLINE)?;
         self.labels.write_label(f)?;
         for c in &self.columns {
+            write!(f, "{}", VLINE)?;
             c.write_label(f)?;
         }
-        writeln!(f)?;
+        writeln!(f, "{}", VLINE)?;
+        // separator
+        write!(f, "{}", RTJOIN)?;
+        self.labels.hline(f)?;
+        for c in &self.columns {
+            write!(f, "{}", CROSS)?;
+            c.hline(f)?;
+        }
+        writeln!(f, "{}", LTJOIN)?;
+
+        // main block
         for idx in 0..self.labels.len() {
+            write!(f, "{}", VLINE)?;
             self.labels.write_item(f, idx, false)?;
             for c in &self.columns {
+                write!(f, "{}", VLINE)?;
                 c.write_item(f, idx, true)?;
             }
-            writeln!(f)?;
+            writeln!(f, "{}", VLINE)?;
         }
+        // lower border
+        write!(f, "{}", DLCORNER)?;
+        self.labels.hline(f)?;
+        for c in &self.columns {
+            write!(f, "{}", HIJOIN)?;
+            c.hline(f)?;
+        }
+        writeln!(f, "{}", DRCORNER)?;
         Ok(())
     }
 }
