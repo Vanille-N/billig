@@ -1,14 +1,12 @@
+mod cli;
 mod lib;
 mod load;
-mod cli;
 
+use cli::table::Table;
 use lib::{
     date::{Date, Month, Period},
     entry::Duration,
     summary::Calendar,
-};
-use cli::{
-    table::Table,
 };
 
 fn main() {
@@ -28,10 +26,9 @@ fn main() {
         cal_month.register(&lst);
         cal_week.register(&lst);
         let table_month = Table::from(cal_month.contents());
-        let table_week = Table::from(cal_week.contents()); 
+        let table_week = Table::from(cal_week.contents());
         println!("{}", table_month);
         println!("{}", table_week);
-
     }
 }
 

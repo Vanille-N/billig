@@ -17,7 +17,13 @@ pub struct Tag(pub String);
 
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}{}.{:02}€", if self.0 >= 0 { "" } else { "-" }, self.0.abs() / 100, (self.0 % 100).abs())
+        write!(
+            f,
+            "{}{}.{:02}€",
+            if self.0 >= 0 { "" } else { "-" },
+            self.0.abs() / 100,
+            (self.0 % 100).abs()
+        )
     }
 }
 

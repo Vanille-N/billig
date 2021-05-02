@@ -1,10 +1,7 @@
 use num_traits::FromPrimitive;
 use std::fmt;
 
-use crate::lib::{
-    summary::Summary,
-    entry::Category,
-};
+use crate::lib::{entry::Category, summary::Summary};
 
 pub struct Table<'d> {
     data: &'d [Summary],
@@ -42,7 +39,13 @@ impl<'d> Table<'d> {
             .collect::<Vec<_>>();
         let mut grid = GridFmt::with_columns(cols);
         for sum in self.data {
-            grid.push_line(BoxFmt::period(sum.period()), sum.amounts().iter().map(|f| BoxFmt::amount(*f)).collect::<Vec<_>>());
+            grid.push_line(
+                BoxFmt::period(sum.period()),
+                sum.amounts()
+                    .iter()
+                    .map(|f| BoxFmt::amount(*f))
+                    .collect::<Vec<_>>(),
+            );
         }
         grid
     }
@@ -51,20 +54,14 @@ impl<'d> Table<'d> {
 impl BoxFmt {
     fn from(text: String) -> Self {
         let width = text.len();
-        Self {
-            text,
-            width,
-        }
+        Self { text, width }
     }
 
     fn amount(a: crate::lib::entry::Amount) -> Self {
         if a.nonzero() {
             let text = format!("{}", a);
             let width = text.len() - 2;
-            Self {
-                text,
-                width,
-            }
+            Self { text, width }
         } else {
             Self::from(String::new())
         }
@@ -110,7 +107,6 @@ impl GridFmt {
     }
 }
 
-
 impl fmt::Display for Table<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.to_formatter())
@@ -153,10 +149,19 @@ const PADDING: &str = "                                         ";
 impl BoxFmt {
     fn write(&self, f: &mut fmt::Formatter, width: usize, right: bool) -> fmt::Result {
         if right {
-            write!(f, " {}{} |", &PADDING[..width.saturating_sub(self.width)], self.text)
+            write!(
+                f,
+                " {}{} |",
+                &PADDING[..width.saturating_sub(self.width)],
+                self.text
+            )
         } else {
-            write!(f, " {}{} |", self.text, &PADDING[..width.saturating_sub(self.width)])
+            write!(
+                f,
+                " {}{} |",
+                self.text,
+                &PADDING[..width.saturating_sub(self.width)]
+            )
         }
     }
 }
-
