@@ -35,6 +35,7 @@ impl<'d> Table<'d> {
         let cols = columns
             .iter()
             .map(|c| BoxFmt::category(*c))
+            .chain(std::iter::once(BoxFmt::from(String::from("Total"))))
             .map(|b| ColFmt::with_label(b))
             .collect::<Vec<_>>();
         let mut grid = GridFmt::with_columns(cols);
@@ -44,6 +45,7 @@ impl<'d> Table<'d> {
                 sum.amounts()
                     .iter()
                     .map(|f| BoxFmt::amount(*f))
+                    .chain(std::iter::once(BoxFmt::amount(sum.total())))
                     .collect::<Vec<_>>(),
             );
         }
