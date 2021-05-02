@@ -17,7 +17,7 @@ pub struct Tag(pub String);
 
 impl fmt::Display for Amount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{:02}€", self.0 / 100, (self.0 % 100).abs())
+        write!(f, "{}{}.{:02}€", if self.0 >= 0 { "" } else { "-" }, self.0.abs() / 100, (self.0 % 100).abs())
     }
 }
 
@@ -317,10 +317,10 @@ mod test {
 
     #[test]
     fn count_categories() {
-        for i in 0..CATEGORY_COUNT {
+        for i in 0..Category::COUNT {
             assert!(Category::from_usize(i).is_some());
         }
-        assert!(Category::from_usize(CATEGORY_COUNT).is_none());
+        assert!(Category::from_usize(Category::COUNT).is_none());
     }
 
     macro_rules! dt {
@@ -542,6 +542,13 @@ mod test {
         assert_eq!(
             bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31))
                 .intersect(Period(dt!(2021-Feb-1), dt!(2021-Feb-15)))
+                .unwrap()
+                .value,
+            Amount(15)
+        );
+        assert_eq!(
+            bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31))
+                .intersect(Period(dt!(2020-Sep-15), dt!(2021-Jan-15)))
                 .unwrap()
                 .value,
             Amount(15)

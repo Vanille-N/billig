@@ -29,6 +29,10 @@ impl Summary {
         self.categories[cat as usize]
     }
 
+    pub fn amounts(&self) -> &[Amount] {
+        &self.categories[..]
+    }
+
     pub fn period(&self) -> Period {
         self.period
     }

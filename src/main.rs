@@ -21,12 +21,17 @@ fn main() {
     if let Some(lst) = entries {
         let period = Period(
             Date::from(2020, Month::Sep, 1).unwrap(),
-            Date::from(2021, Month::Mar, 1).unwrap(),
+            Date::from(2021, Month::Sep, 1).unwrap(),
         );
-        let mut calendar = Calendar::from_spacing(period, Duration::Month, 1);
-        calendar.register(&lst);
-        let table = Table::from(calendar.contents());
-        println!("{}", table);
+        let mut cal_month = Calendar::from_spacing(period, Duration::Month, 1);
+        let mut cal_week = Calendar::from_spacing(period, Duration::Week, 1);
+        cal_month.register(&lst);
+        cal_week.register(&lst);
+        let table_month = Table::from(cal_month.contents());
+        let table_week = Table::from(cal_week.contents()); 
+        println!("{}", table_month);
+        println!("{}", table_week);
+
     }
 }
 
