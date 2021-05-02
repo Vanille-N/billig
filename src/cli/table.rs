@@ -116,9 +116,47 @@ impl fmt::Display for Table<'_> {
         write!(f, "{}", self.to_formatter())
     }
 }
+
+impl fmt::Display for GridFmt {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.labels.write_label(f)?;
+        for c in &self.columns {
+            c.write_label(f)?;
+        }
+        writeln!(f)?;
+        for idx in 0..self.labels.len() {
+            self.labels.write_item(f, idx, false)?;
+            for c in &self.columns {
+                c.write_item(f, idx, true)?;
             }
-            writeln!(f);
+            writeln!(f)?;
         }
         Ok(())
     }
 }
+
+impl ColFmt {
+    fn write_label(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.label.write(f, self.width, true)
+    }
+
+    fn write_item(&self, f: &mut fmt::Formatter, idx: usize, right: bool) -> fmt::Result {
+        self.boxes[idx].write(f, self.width, right)
+    }
+
+    fn len(&self) -> usize {
+        self.boxes.len()
+    }
+}
+
+const PADDING: &str = "                                         ";
+impl BoxFmt {
+    fn write(&self, f: &mut fmt::Formatter, width: usize, right: bool) -> fmt::Result {
+        if right {
+            write!(f, " {}{} |", &PADDING[..width.saturating_sub(self.width)], self.text)
+        } else {
+            write!(f, " {}{} |", self.text, &PADDING[..width.saturating_sub(self.width)])
+        }
+    }
+}
+
