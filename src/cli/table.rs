@@ -176,22 +176,37 @@ impl ColFmt {
     fn len(&self) -> usize {
         self.boxes.len()
     }
+
+    fn hline(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", &HLINE[..(self.width+2)*3])
+    }
 }
 
 const PADDING: &str = "                                         ";
+const HLINE: &str = "─────────────────────────────────────────";
+const VLINE: &str = "│";
+const ULCORNER: &str = "┌";
+const URCORNER: &str = "┐";
+const DLCORNER: &str = "└";
+const DRCORNER: &str = "┘";
+const LTJOIN: &str = "┤";
+const RTJOIN: &str = "├";
+const HIJOIN: &str = "┴";
+const LOJOIN: &str = "┬";
+const CROSS: &str = "┼";
 impl BoxFmt {
     fn write(&self, f: &mut fmt::Formatter, width: usize, right: bool) -> fmt::Result {
         if right {
             write!(
                 f,
-                " {}{} |",
+                " {}{} ",
                 &PADDING[..width.saturating_sub(self.width)],
                 self.text
             )
         } else {
             write!(
                 f,
-                " {}{} |",
+                " {}{} ",
                 self.text,
                 &PADDING[..width.saturating_sub(self.width)]
             )
