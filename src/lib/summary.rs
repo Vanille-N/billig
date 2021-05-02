@@ -2,14 +2,14 @@ use std::ops;
 
 use crate::lib::{
     date::{Date, Period},
-    entry::{Amount, Category, Duration, Entry, CATEGORY_COUNT},
+    entry::{Amount, Category, Duration, Entry},
 };
 
 #[derive(Debug, Clone)]
 pub struct Summary {
     period: Period,
     total: Amount,
-    categories: [Amount; CATEGORY_COUNT],
+    categories: [Amount; Category::COUNT],
 }
 
 impl Summary {
@@ -17,7 +17,7 @@ impl Summary {
         Self {
             period,
             total: Amount::from(0),
-            categories: [Amount::from(0); CATEGORY_COUNT],
+            categories: [Amount::from(0); Category::COUNT],
         }
     }
 
@@ -27,6 +27,10 @@ impl Summary {
 
     pub fn query(&self, cat: Category) -> Amount {
         self.categories[cat as usize]
+    }
+
+    pub fn period(&self) -> Period {
+        self.period
     }
 
     pub fn total(&self) -> Amount {
@@ -145,6 +149,10 @@ impl Calendar {
                 *summary += item;
             }
         }
+    }
+
+    pub fn contents(&self) -> &[Summary] {
+        &self.items
     }
 }
 

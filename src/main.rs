@@ -1,10 +1,14 @@
 mod lib;
 mod load;
+mod cli;
 
 use lib::{
     date::{Date, Month, Period},
     entry::Duration,
     summary::Calendar,
+};
+use cli::{
+    table::Table,
 };
 
 fn main() {
@@ -21,10 +25,8 @@ fn main() {
         );
         let mut calendar = Calendar::from_spacing(period, Duration::Month, 1);
         calendar.register(&lst);
-        for entry in &lst {
-            println!("{}", entry);
-        }
-        println!("{:?}", calendar);
+        let table = Table::from(calendar.contents());
+        println!("{}", table);
     }
 }
 

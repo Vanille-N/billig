@@ -39,15 +39,14 @@ pub struct Entry {
 
 #[derive(Debug, Clone, Copy, FromPrimitive)]
 pub enum Category {
-    School = 0,
-    Food,
-    Home,
     Salary,
-    Tech,
-    Movement,
+    Home,
+    School,
     Cleaning,
+    Movement,
+    Tech,
+    Food,
 }
-pub const CATEGORY_COUNT: usize = 7;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Span {
@@ -78,9 +77,17 @@ impl Amount {
         Self(0)
     }
 
+    pub fn nonzero(&self) -> bool {
+        self.0 != 0
+    }
+
     pub fn from(i: isize) -> Self {
         Self(i)
     }
+}
+
+impl Category {
+    pub const COUNT: usize = 7;
 }
 
 use std::ops;
