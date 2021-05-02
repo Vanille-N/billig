@@ -48,6 +48,68 @@ impl<'d> Table<'d> {
     }
 }
 
+impl BoxFmt {
+    fn from(text: String) -> Self {
+        let width = text.len();
+        Self {
+            text,
+            width,
+        }
+    }
+
+    fn amount(a: crate::lib::entry::Amount) -> Self {
+        if a.nonzero() {
+            let text = format!("{}", a);
+            let width = text.len() - 2;
+            Self {
+                text,
+                width,
+            }
+        } else {
+            Self::from(String::new())
+        }
+    }
+
+    fn period(p: crate::lib::date::Period) -> Self {
+        Self::from(format!("{}", p))
+    }
+
+    fn category(c: crate::lib::entry::Category) -> Self {
+        Self::from(format!("{:?}", c))
+    }
+}
+
+impl ColFmt {
+    fn with_label(label: BoxFmt) -> Self {
+        Self {
+            width: label.width + 3,
+            label,
+            boxes: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, b: BoxFmt) {
+        self.width = self.width.max(b.width + 3);
+        self.boxes.push(b);
+    }
+}
+
+impl GridFmt {
+    fn with_columns(columns: Vec<ColFmt>) -> Self {
+        Self {
+            labels: ColFmt::with_label(BoxFmt::from(String::new())),
+            columns,
+        }
+    }
+
+    fn push_line(&mut self, label: BoxFmt, boxes: Vec<BoxFmt>) {
+        self.labels.push(label);
+        for (i, b) in boxes.into_iter().enumerate() {
+            self.columns[i].push(b);
+        }
+    }
+}
+
 
 impl fmt::Display for Table<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
