@@ -232,5 +232,30 @@ impl Statistics {
         Shader::with_steps(deciles)
     }
 }
+
+#[derive(Copy, Clone)]
+pub struct Color(u8, u8, u8);
+
+pub struct Shader {
+    steps: Vec<(f64, Color)>,
+}
+
+impl Shader {
+    const STEPS: &'static [Color] = &[
+        Color(255, 0, 0),
+        Color(255, 43, 0),
+        Color(255, 85, 0),
+        Color(255, 128, 0),
+        Color(255, 170, 0),
+        Color(255, 213, 0),
+        Color(255, 255, 0),
+        Color(213, 255, 0),
+        Color(170, 255, 0),
+        Color(128, 255, 0),
+        Color(85, 255, 0),
+        Color(43, 255, 0),
+        Color(0, 255, 0),
+    ];
+
     }
 }
