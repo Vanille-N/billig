@@ -21,14 +21,18 @@ fn main() {
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2021, Month::Sep, 1).unwrap(),
         );
-        let mut cal_month = Calendar::from_spacing(period, Duration::Month, 1);
         let mut cal_week = Calendar::from_spacing(period, Duration::Week, 1);
-        cal_month.register(&lst);
+        let mut cal_month = Calendar::from_spacing(period, Duration::Month, 1);
+        let mut cal_year = Calendar::from_spacing(period, Duration::Year, 1);
         cal_week.register(&lst);
-        let table_month = Table::from(cal_month.contents());
-        let table_week = Table::from(cal_week.contents());
+        cal_month.register(&lst);
+        cal_year.register(&lst);
+        let table_week = Table::from(cal_week.contents()).with_title("Weekly");
+        let table_month = Table::from(cal_month.contents()).with_title("Monthly");
+        let table_year = Table::from(cal_year.contents()).with_title("Yearly");
         println!("{}", table_week);
         println!("{}", table_month);
+        println!("{}", table_year);
     }
 }
 

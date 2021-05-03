@@ -8,6 +8,7 @@ use crate::lib::{
 };
 
 pub struct Table<'d> {
+    title: String,
     data: &'d [Summary],
 }
 
@@ -30,7 +31,16 @@ struct GridFmt {
 
 impl<'d> Table<'d> {
     pub fn from(data: &'d [Summary]) -> Self {
-        Self { data }
+        Self {
+            title: String::new(),
+            data,
+        }
+    }
+
+    pub fn with_title<S>(mut self, s: S) -> Self
+    where S: ToString {
+        self.title = s.to_string();
+        self
     }
 
     fn to_formatter(&self) -> GridFmt {
@@ -40,7 +50,7 @@ impl<'d> Table<'d> {
         let cols = columns
             .iter()
             .map(|c| BoxFmt::category(*c))
-            .chain(std::iter::once(BoxFmt::from(String::from("Total"))))
+            .chain(std::iter::once(BoxFmt::from("Total")))
             .map(|b| ColFmt::with_label(b))
             .collect::<Vec<_>>();
         let mut shaders = (0..Category::COUNT)
@@ -58,7 +68,7 @@ impl<'d> Table<'d> {
             .map(Statistics::make_shader)
             .collect::<Vec<_>>();
         let shader_total = shader_total.make_shader();
-        let mut grid = GridFmt::with_columns(cols);
+        let mut grid = GridFmt::with_columns(BoxFmt::from(&self.title), cols);
         for sum in self.data {
             grid.push_line(
                 BoxFmt::period(sum.period()),
@@ -78,7 +88,9 @@ impl<'d> Table<'d> {
 }
 
 impl BoxFmt {
-    fn from(text: String) -> Self {
+    fn from<S>(text: S) -> Self
+    where S: ToString {
+        let text = text.to_string();
         let width = text.len();
         Self {
             text,
@@ -131,9 +143,9 @@ impl ColFmt {
 }
 
 impl GridFmt {
-    fn with_columns(columns: Vec<ColFmt>) -> Self {
+    fn with_columns(title: BoxFmt, columns: Vec<ColFmt>) -> Self {
         Self {
-            labels: ColFmt::with_label(BoxFmt::from(String::new())),
+            labels: ColFmt::with_label(title),
             columns,
         }
     }
@@ -164,10 +176,10 @@ impl fmt::Display for GridFmt {
         writeln!(f, "{}", URCORNER)?;
         // title line
         write!(f, "{}", VLINE)?;
-        self.labels.write_label(f)?;
+        self.labels.write_label(f, false)?;
         for c in &self.columns {
             write!(f, "{}", VLINE)?;
-            c.write_label(f)?;
+            c.write_label(f, true)?;
         }
         writeln!(f, "{}", VLINE)?;
         // separator
@@ -202,8 +214,8 @@ impl fmt::Display for GridFmt {
 }
 
 impl ColFmt {
-    fn write_label(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.label.write(f, self.width, true)
+    fn write_label(&self, f: &mut fmt::Formatter, right: bool) -> fmt::Result {
+        self.label.write(f, self.width, right)
     }
 
     fn write_item(&self, f: &mut fmt::Formatter, idx: usize, right: bool) -> fmt::Result {
