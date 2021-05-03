@@ -257,5 +257,28 @@ impl Shader {
         Color(0, 255, 0),
     ];
 
+    fn with_steps(steps: Vec<f64>) -> Self {
+        let nb = steps.len();
+        let max = Self::STEPS.len();
+        let indexer = |i| (max - 1) * i / (nb - 1);
+        Self {
+            steps: steps
+                .into_iter()
+                .enumerate()
+                .map(|(i, f)| (f, Self::STEPS[indexer(i)]))
+                .collect::<Vec<_>>(),
+        }
+    }
+
+    pub fn generate(&self, data: f64) -> Color {
+        for w in self.steps.windows(2) {
+            if w[0].0 < data && data <= w[1].0 {
+                return w[0].1;
+            }
+        }
+        self.steps[0].1
+    }
+}
+
     }
 }
