@@ -16,8 +16,8 @@ impl Summary {
     pub fn from_period(period: Period) -> Self {
         Self {
             period,
-            total: Amount::from(0),
-            categories: [Amount::from(0); Category::COUNT],
+            total: Amount(0),
+            categories: [Amount(0); Category::COUNT],
         }
     }
 

@@ -10,7 +10,7 @@ pub mod fields {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Amount(isize);
+pub struct Amount(pub isize);
 
 #[derive(Debug, Clone)]
 pub struct Tag(pub String);
@@ -76,20 +76,6 @@ pub enum Window {
     Anterior,
     Precedent,
     Successor,
-}
-
-impl Amount {
-    pub fn zero() -> Self {
-        Self(0)
-    }
-
-    pub fn nonzero(&self) -> bool {
-        self.0 != 0
-    }
-
-    pub fn from(i: isize) -> Self {
-        Self(i)
-    }
 }
 
 impl Category {

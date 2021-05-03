@@ -331,7 +331,7 @@ fn instantiate_amount(
     templ: &Template,
     args: &HashMap<String, Arg>,
 ) -> Option<(fields::Amount, HashSet<String>)> {
-    let mut sum = fields::Amount::zero();
+    let mut sum = fields::Amount(0);
     let mut used = HashSet::new();
     for item in &templ.value.sum {
         match item {

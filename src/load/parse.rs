@@ -27,7 +27,7 @@ pub mod ast {
 
 /// Pest-generated parser
 #[derive(Parser)]
-#[grammar = "billig.pest"]
+#[grammar = "load/billig.pest"]
 struct BilligParser;
 
 /// A collection of AST items, i.e. entries and template definitions
@@ -168,7 +168,7 @@ macro_rules! parse_usize {
 macro_rules! parse_amount {
     ( $node:expr ) => {
         // safe to .unwrap() because the grammar validated it already
-        Amount::from(($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize)
+        Amount(($node.as_str().parse::<f64>().unwrap() * 100.0).round() as isize)
     };
 }
 
