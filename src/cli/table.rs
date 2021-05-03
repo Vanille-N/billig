@@ -51,7 +51,7 @@ impl<'d> Table<'d> {
             .iter()
             .map(|c| BoxFmt::category(*c))
             .chain(std::iter::once(BoxFmt::from("Total")))
-            .map(|b| ColFmt::with_label(b))
+            .map(ColFmt::with_label)
             .collect::<Vec<_>>();
         let mut shaders = (0..Category::COUNT)
             .map(|_| Statistics::new())
@@ -348,8 +348,12 @@ impl Shader {
                 .map(|(i, f)| (f, shades[indexer(i)]))
                 .collect::<Vec<_>>();
             let delta = arr.get(0).map(|(f, _)| *f).unwrap_or(0.0) - arr.last().map(|(f, _)| *f).unwrap_or(0.0);
-            arr.get_mut(0).map(|f| f.0 += delta);
-            arr.last_mut().map(|f| f.0 -= delta);
+            if let Some(f) = arr.get_mut(0) {
+                f.0 += delta;
+            }
+            if let Some(f) = arr.last_mut() {
+                f.0 -= delta;
+            }
             arr
         };
         Self {
