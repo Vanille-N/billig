@@ -267,24 +267,33 @@ impl BoxFmt {
     }
 }
 
-pub struct Statistics(Vec<f64>);
+#[derive(Default)]
+pub struct Statistics {
+    positive: Vec<f64>,
+    negative: Vec<f64>,
+}
 
 impl Statistics {
     pub fn new() -> Self {
-        Self(Vec::new())
+        Self::default()
     }
 
     pub fn register(&mut self, data: f64) {
-        self.0.push(data);
+        if data >= 0.0 {
+            self.positive.push(data);
+        } else {
+            self.negative.push(data);
+        }
     }
 
     pub fn make_shader(mut self) -> Shader {
-        self.0
-            .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
-        let deciles = (0..=10)
-            .map(|i| self.0[(self.0.len() - 1) * i / 10])
-            .collect::<Vec<_>>();
-        Shader::with_steps(deciles)
+        let make_deciles = |v: &mut Vec<f64>, reverse: bool| {
+            v.sort_by(|a, b| if reverse { a.partial_cmp(b) } else { b.partial_cmp(a) }.unwrap_or(std::cmp::Ordering::Less));
+            (0..=10)
+                .map(|i| *v.get(v.len().saturating_sub(1) * i / 10).unwrap_or(&0.0))
+                .collect::<Vec<_>>()
+        };
+        Shader::with_steps(make_deciles(&mut self.negative, true), make_deciles(&mut self.positive, false))
     }
 }
 
@@ -292,46 +301,78 @@ impl Statistics {
 pub struct Color(u8, u8, u8);
 
 pub struct Shader {
-    steps: Vec<(f64, Color)>,
+    positive: Vec<(f64, Color)>,
+    negative: Vec<(f64, Color)>,
 }
 
 impl Shader {
-    const STEPS: &'static [Color] = &[
+    const RED_YLW: &'static [Color] = &[
         Color(255, 0, 0),
-        Color(255, 43, 0),
-        Color(255, 85, 0),
-        Color(255, 128, 0),
-        Color(255, 170, 0),
-        Color(255, 213, 0),
-        Color(255, 255, 0),
-        Color(213, 255, 0),
-        Color(170, 255, 0),
-        Color(128, 255, 0),
-        Color(85, 255, 0),
-        Color(43, 255, 0),
-        Color(0, 255, 0),
+        Color(255, 18, 0),
+        Color(255, 37, 0),
+        Color(255, 55, 0),
+        Color(255, 74, 0),
+        Color(255, 92, 0),
+        Color(255, 110, 0),
+        Color(255, 129, 0),
+        Color(255, 147, 0),
+        Color(255, 166, 0),
+        Color(255, 184, 0),
+        Color(255, 203, 0),
+        Color(255, 221, 0),
     ];
 
-    fn with_steps(steps: Vec<f64>) -> Self {
-        let nb = steps.len();
-        let max = Self::STEPS.len();
-        let indexer = |i| (max - 1) * i / (nb - 1);
-        Self {
-            steps: steps
-                .into_iter()
+    const GRN_BLU: &'static [Color] = &[
+        Color(0, 255, 255),
+        Color(0, 255, 213),
+        Color(0, 255, 170),
+        Color(0, 255, 128),
+        Color(0, 255, 85),
+        Color(0, 255, 43),
+        Color(0, 255, 0),
+        Color(43, 255, 0),
+        Color(85, 255, 0),
+        Color(128, 255, 0),
+        Color(170, 255, 0),
+        Color(213, 255, 0),
+        Color(255, 255, 0),
+    ];
+
+    fn with_steps(steps_neg: Vec<f64>, steps_pos: Vec<f64>) -> Self {
+        let make_steps = |v: Vec<f64>, shades: &[Color]| {
+            let nb = v.len();
+            let max = shades.len();
+            let indexer = |i| (max - 1) * i / (nb - 1);
+            let mut arr = v.into_iter()
                 .enumerate()
-                .map(|(i, f)| (f, Self::STEPS[indexer(i)]))
-                .collect::<Vec<_>>(),
+                .map(|(i, f)| (f, shades[indexer(i)]))
+                .collect::<Vec<_>>();
+            let delta = arr.get(0).map(|(f, _)| *f).unwrap_or(0.0) - arr.last().map(|(f, _)| *f).unwrap_or(0.0);
+            arr.get_mut(0).map(|f| f.0 += delta);
+            arr.last_mut().map(|f| f.0 -= delta);
+            arr
+        };
+        Self {
+            positive: make_steps(steps_pos, Self::GRN_BLU),
+            negative: make_steps(steps_neg, Self::RED_YLW),
         }
     }
 
     pub fn generate(&self, data: f64) -> Color {
-        for w in self.steps.windows(2) {
-            if w[0].0 < data && data <= w[1].0 {
+        let chooser = if data >= 0.0 {
+            &self.positive
+        } else {
+            &self.negative
+        };
+        let contains = |b, (lo, hi)| {
+            (lo < b && b <= hi) || (hi < b && b <= lo)
+        };
+        for w in chooser.windows(2) {
+            if contains(data, (w[0].0, w[1].0)) {
                 return w[0].1;
             }
         }
-        self.steps[0].1
+        chooser[0].1
     }
 }
 
