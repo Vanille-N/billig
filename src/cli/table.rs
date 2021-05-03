@@ -280,5 +280,12 @@ impl Shader {
     }
 }
 
+impl Color {
+    pub const BLANK: &'static str = "\x1b[0m";
+}
+
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\x1b[38;2;{};{};{}m", self.0, self.1, self.2)
     }
 }
