@@ -43,14 +43,33 @@ impl<'d> Table<'d> {
             .chain(std::iter::once(BoxFmt::from(String::from("Total"))))
             .map(|b| ColFmt::with_label(b))
             .collect::<Vec<_>>();
+        let mut shaders = (0..Category::COUNT)
+            .map(|_| Statistics::new())
+            .collect::<Vec<_>>();
+        let mut shader_total = Statistics::new();
+        for sum in self.data {
+            for (i, data) in sum.amounts().iter().enumerate() {
+                shaders[i].register(data.0 as f64);
+            }
+            shader_total.register(sum.total().0 as f64);
+        }
+        let shaders = shaders
+            .into_iter()
+            .map(Statistics::make_shader)
+            .collect::<Vec<_>>();
+        let shader_total = shader_total.make_shader();
         let mut grid = GridFmt::with_columns(cols);
         for sum in self.data {
             grid.push_line(
                 BoxFmt::period(sum.period()),
                 sum.amounts()
                     .iter()
-                    .map(|f| BoxFmt::amount(*f))
-                    .chain(std::iter::once(BoxFmt::amount(sum.total())))
+                    .enumerate()
+                    .map(|(i, f)| BoxFmt::amount(*f).with_shade(shaders[i].generate(f.0 as f64)))
+                    .chain(std::iter::once(
+                        BoxFmt::amount(sum.total())
+                            .with_shade(shader_total.generate(sum.total().0 as f64)),
+                    ))
                     .collect::<Vec<_>>(),
             );
         }
