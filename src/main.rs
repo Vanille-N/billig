@@ -27,8 +27,8 @@ fn main() {
         cal_week.register(&lst);
         let table_month = Table::from(cal_month.contents());
         let table_week = Table::from(cal_week.contents());
-        println!("{}", table_month);
         println!("{}", table_week);
+        println!("{}", table_month);
     }
 }
 

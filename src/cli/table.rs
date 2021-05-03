@@ -211,5 +211,26 @@ impl BoxFmt {
                 &PADDING[..width.saturating_sub(self.width)]
             )
         }
+
+pub struct Statistics(Vec<f64>);
+
+impl Statistics {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn register(&mut self, data: f64) {
+        self.0.push(data);
+    }
+
+    pub fn make_shader(mut self) -> Shader {
+        self.0
+            .sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
+        let deciles = (0..=10)
+            .map(|i| self.0[(self.0.len() - 1) * i / 10])
+            .collect::<Vec<_>>();
+        Shader::with_steps(deciles)
+    }
+}
     }
 }
