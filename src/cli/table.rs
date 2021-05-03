@@ -1,7 +1,11 @@
 use num_traits::FromPrimitive;
 use std::fmt;
 
-use crate::lib::{entry::Category, summary::Summary};
+use crate::lib::{
+    date::Period,
+    entry::{Amount, Category},
+    summary::Summary,
+};
 
 pub struct Table<'d> {
     data: &'d [Summary],
@@ -10,6 +14,7 @@ pub struct Table<'d> {
 struct BoxFmt {
     width: usize,
     text: String,
+    color: Option<Color>,
 }
 
 struct ColFmt {
@@ -56,25 +61,38 @@ impl<'d> Table<'d> {
 impl BoxFmt {
     fn from(text: String) -> Self {
         let width = text.len();
-        Self { text, width }
+        Self {
+            text,
+            width,
+            color: None,
+        }
     }
 
-    fn amount(a: crate::lib::entry::Amount) -> Self {
-        if a.nonzero() {
+    fn amount(a: Amount) -> Self {
+        if a != Amount(0) {
             let text = format!("{}", a);
             let width = text.len() - 2;
-            Self { text, width }
+            Self {
+                text,
+                width,
+                color: None,
+            }
         } else {
             Self::from(String::new())
         }
     }
 
-    fn period(p: crate::lib::date::Period) -> Self {
+    fn period(p: Period) -> Self {
         Self::from(format!("{}", p))
     }
 
-    fn category(c: crate::lib::entry::Category) -> Self {
+    fn category(c: Category) -> Self {
         Self::from(format!("{:?}", c))
+    }
+
+    fn with_shade(mut self, shade: Color) -> Self {
+        self.color = Some(shade);
+        self
     }
 }
 
@@ -178,7 +196,7 @@ impl ColFmt {
     }
 
     fn hline(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &HLINE[..(self.width+2)*3])
+        write!(f, "{}", &HLINE[..(self.width + 2) * 3])
     }
 }
 
@@ -196,21 +214,27 @@ const LOJOIN: &str = "┬";
 const CROSS: &str = "┼";
 impl BoxFmt {
     fn write(&self, f: &mut fmt::Formatter, width: usize, right: bool) -> fmt::Result {
+        if let Some(c) = self.color {
+            write!(f, "{}", c)?;
+        }
         if right {
             write!(
                 f,
                 " {}{} ",
                 &PADDING[..width.saturating_sub(self.width)],
-                self.text
-            )
+                self.text,
+            )?;
         } else {
             write!(
                 f,
                 " {}{} ",
                 self.text,
-                &PADDING[..width.saturating_sub(self.width)]
-            )
+                &PADDING[..width.saturating_sub(self.width)],
+            )?;
         }
+        write!(f, "{}", Color::BLANK)
+    }
+}
 
 pub struct Statistics(Vec<f64>);
 
