@@ -511,6 +511,31 @@ impl fmt::Display for Period {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum PeriodError {
+    WrongDate(DateError),
+    TooManyDots(String),
+    TooManyItems(String),
+}
+
+impl FromStr for Period {
+    type Err = PeriodError;
+
+    fn from_str(s: &str) -> Result<Self, PeriodError> {
+        let (fst, snd) = if s.contains("..") {
+            let mut items = s.split("..");
+            let fst = items.next();
+            let snd = items.next();
+            if let Some(it) = items.next() {
+                return Err(PeriodError::TooManyDots(it.to_string()));
+            }
+            (fst, Some(snd))
+        } else {
+            (Some(s), None)
+        };
+    }
+}
+
 #[cfg(test)]
 #[rustfmt::skip]
 mod test {
@@ -796,5 +821,19 @@ mod test {
         pp!(dt!(2020-Jan-1), dt!(2020-Dec-31) => "2020");
         pp!(dt!(2020-Jan-1), dt!(2023-Dec-31) => "2020..2023");
         pp!(dt!(2020-Jan-3), dt!(2023-Feb-28) => "2020-Jan-3..2023-Feb");
+    }
+
+    macro_rules! period_err {
+        ( $s:expr => $e:pat) => {{
+            let get = $s.parse::<Period>();
+            if !matches!(get, Err($e)) {
+                panic!("{:?} is unexpected",  get);
+            }
+        }}
+    }
+    use super::PeriodError::*;
+    #[test]
+    fn period_parse() {
+        period_err!("a..b..c" => TooManyDots(_));
     }
 }
