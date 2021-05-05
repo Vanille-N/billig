@@ -1,0 +1,27 @@
+digit = _{ '0'..'9' }
+year = @{ digit{4} }
+day = @{ digit{1,2} }
+
+uppercase = _{ 'A'..'Z' }
+lowercase = _{ 'a'..'z' }
+month = @{ uppercase ~ lowercase+ }
+
+month_date = { month ~ ( "-" ~ day )? }
+full_date = { year ~ ( "-" ~ month_date )? }
+partial_date = _{
+    full_date
+  | month_date
+  | day
+}
+
+after = { full_date ~ ".." }
+before = { ".." ~ full_date? }
+range = { full_date ~ ".." ~ partial_date }
+period = _{
+    SOI ~ (
+        range
+      | after
+      | before
+      | full_date
+    ) ~ EOI
+}
