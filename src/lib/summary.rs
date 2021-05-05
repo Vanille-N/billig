@@ -7,12 +7,16 @@ use crate::lib::{
 
 #[derive(Debug, Clone)]
 pub struct Summary {
+    /// Period of relevance added entries are to be intersected with
     period: Period,
+    /// Cached total
     total: Amount,
+    /// Subtotals per expense kind
     categories: [Amount; Category::COUNT],
 }
 
 impl Summary {
+    /// Initialize blank
     pub fn from_period(period: Period) -> Self {
         Self {
             period,
@@ -21,14 +25,17 @@ impl Summary {
         }
     }
 
+    /// Initialize blank for a single day
     pub fn from_date(date: Date) -> Self {
         Self::from_period(Period(date, date))
     }
 
+    /// Read subtotal for an expense kind
     pub fn query(&self, cat: Category) -> Amount {
         self.categories[cat as usize]
     }
 
+    /// Read all subtotals
     pub fn amounts(&self) -> &[Amount] {
         &self.categories[..]
     }
@@ -78,7 +85,7 @@ impl Calendar {
         Self { items }
     }
 
-    /// Construct from a starting point and a step function
+    /// Construct from a starting point and an _increasing_ step function
     pub fn from_step<F>(mut start: Date, step: F) -> Self
     where
         F: Fn(Date) -> Option<Date>,
@@ -92,6 +99,7 @@ impl Calendar {
         Self { items }
     }
 
+    /// Construct from a standardized span step generator
     pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
         Self::from_step(period.0, |date| {
             let next = match duration {
@@ -146,6 +154,7 @@ impl Calendar {
         &mut self.items[start..=end]
     }
 
+    /// Add all entries to the summary
     pub fn register(&mut self, items: &[Entry]) {
         for item in items {
             let range = self.dichotomy_mut(item.period());

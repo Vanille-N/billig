@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
-    date::Date,
+    date::{Date, Period},
     entry::{
         fields::{self, Category, Span},
         Entry,
@@ -177,25 +177,32 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate(errs: &mut Record, items: ast::Ast<'_>) -> Vec<Entry> {
+pub fn instanciate(errs: &mut Record, items: ast::Ast<'_>) -> (Vec<Entry>, Period) {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
+    let mut period = Period::unbounded();
     use ast::*;
     'ast: for item in items {
         match item {
-            Item::Entry(entry) => entries.push(entry),
+            Item::Entry(entry) => {
+                period.unite(entry.period());
+                entries.push(entry);
+            }
             Item::Template(name, body) => {
                 templates.insert(name.to_string(), body);
             }
             Item::Instance(date, instance) => {
                 match instanciate_item(errs, instance, date, &templates) {
-                    Some(inst) => entries.push(inst),
+                    Some(inst) => {
+                        period.unite(inst.period());
+                        entries.push(inst);
+                    }
                     None => continue 'ast,
                 }
             }
         }
     }
-    entries
+    (entries, period)
 }
 
 /// Attempts template expansion

@@ -1,3 +1,5 @@
+//! Implementations directly related to entries and their fields
+
 use std::fmt;
 use std::str::FromStr;
 
@@ -5,13 +7,16 @@ use num_derive::FromPrimitive;
 
 use crate::lib::date::{Date, Period};
 
+/// Contents of entries
 pub mod fields {
     pub use super::{Amount, Category, Duration, Span, Tag, Window};
 }
 
+/// A quantity of money with cent precision
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Amount(pub isize);
 
+/// A label for an expense
 #[derive(Debug, Clone)]
 pub struct Tag(pub String);
 
@@ -43,6 +48,7 @@ pub struct Entry {
     tag: Option<Tag>,
 }
 
+/// Kinds of expenses
 #[derive(Debug, Clone, Copy, FromPrimitive)]
 pub enum Category {
     Salary,
@@ -54,6 +60,7 @@ pub enum Category {
     Food,
 }
 
+/// Generic period generator when given a reference date
 #[derive(Debug, Clone, Copy)]
 pub struct Span {
     duration: Duration,
@@ -61,6 +68,7 @@ pub struct Span {
     count: usize,
 }
 
+/// Granularity of `Span` length
 #[derive(Debug, Clone, Copy)]
 pub enum Duration {
     Day,
@@ -69,6 +77,7 @@ pub enum Duration {
     Year,
 }
 
+/// Position of `Span` relative to reference date
 #[derive(Debug, Clone, Copy)]
 pub enum Window {
     Current,
@@ -117,6 +126,7 @@ impl std::iter::Sum for Amount {
 }
 
 impl Entry {
+    /// Aggregate elements into a single entry
     pub fn from(date: Date, value: Amount, cat: Category, span: Span, tag: Tag) -> Self {
         let period = span.period(date);
         let length = period.1.index() - period.0.index() + 1;
@@ -129,6 +139,7 @@ impl Entry {
         }
     }
 
+    /// Calculate intersection with a period, discard the label
     pub fn intersect_loss(&self, period: Period) -> Option<Self> {
         let start = period.0.max(self.period.0);
         let end = period.1.min(self.period.1);
@@ -159,6 +170,7 @@ impl Entry {
         })
     }
 
+    /// Calculate intersection with a period, keep the label
     pub fn intersect(mut self, period: Period) -> Option<Self> {
         let tag = self.tag.take();
         self.intersect_loss(period).map(|mut entry| {
@@ -207,6 +219,7 @@ impl Span {
         }
     }
 
+    /// Use reference date to create a range of dates
     pub fn period(&self, dt: Date) -> Period {
         use Duration::*;
         use Window::*;

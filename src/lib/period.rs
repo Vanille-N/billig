@@ -1,3 +1,5 @@
+//! An inclusive range of dates
+
 use std::fmt;
 use std::str::FromStr;
 
@@ -5,6 +7,7 @@ use crate::lib::{
     date::{Date, DateError, Month},
 };
 
+/// `Period(a, b)` is the range of dates from `a` to `b` inclusive
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Period(pub Date, pub Date);
 
@@ -76,8 +79,7 @@ impl fmt::Display for Period {
 
 use pest::Parser;
 use pest_derive::*;
-use crate::load::error::Error;
-use crate::load::error::Loc;
+use crate::load::error::{Error, Loc};
 
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
@@ -88,7 +90,28 @@ type Result<T> = std::result::Result<T, Error<Rule>>;
 struct PeriodParser;
 
 impl Period {
-    pub fn parse(s: &str) -> 
+    pub fn unbounded() -> Self {
+        Self(Date::MIN, Date::MAX)
+    }
+
+    pub fn unite(&mut self, other: Self) {
+        if self.0 == Date::MIN || other.0 < self.0 {
+            self.0 = other.0;
+        }
+        if self.1 == Date::MAX || other.1 > self.1 {
+            self.1 = other.1;
+        }
+    }
+
+    pub fn intersect(&mut self, other: Self) {
+        if self.0 == Date::MIN || other.0 > self.0 {
+            self.0 = other.0;
+        }
+        if self.1 == Date::MAX || other.1 < self.1 {
+            self.1 = other.1;
+        }
+    }
+}
 
 impl FromStr for Period {
     type Err = Error<Rule>;
