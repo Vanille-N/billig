@@ -3,7 +3,7 @@ pub mod parse;
 pub mod template;
 
 
-pub fn read_entries(filename: &str) -> (Option<Vec<crate::lib::entry::Entry>>, error::Record) {
+pub fn read_entries(filename: &str) -> (Option<Vec<crate::lib::entry::Entry>>, error::Record<parse::Rule>) {
     let contents = std::fs::read_to_string(&filename).expect("File not found");
     let mut errs = error::Record::new();
     let data = parse::extract(&filename, &mut errs, &contents);

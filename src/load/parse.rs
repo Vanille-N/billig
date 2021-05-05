@@ -11,6 +11,7 @@ type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 /// Wrapper around Pest's `Pairs`
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
+
 use crate::lib::{
     date::{Date, Month},
     entry::{self, Amount, Category, Entry, Span, Tag},
@@ -19,6 +20,7 @@ use crate::load::{
     error,
     template::models::{self, Arg, Instance, Template},
 };
+type Record = error::Record<Rule>;
 
 /// Convenient exports
 pub mod ast {
@@ -63,7 +65,7 @@ impl<'i, T> Once<'i, T> {
         }
     }
 
-    fn try_set(&mut self, val: T, errs: &mut error::Record) {
+    fn try_set(&mut self, val: T, errs: &mut Record) {
         if self.data.is_some() {
             errs.make("Duplicate field definition")
                 .span(self.loc, format!("attempt to override {}", self.name))
@@ -74,7 +76,7 @@ impl<'i, T> Once<'i, T> {
         self.data = Some(val);
     }
 
-    fn try_get(self, errs: &mut error::Record) -> Option<T> {
+    fn try_get(self, errs: &mut Record) -> Option<T> {
         if self.valid {
             if self.data.is_none() {
                 errs.make("Missing field definition")
@@ -102,7 +104,7 @@ impl<'i, T> Once<'i, T> {
 ///
 /// Caller should determine the success of this function not through its return value
 /// but by querying `errs` (e.g. by checking `errs.is_fatal()` or `errs.count_errors()`)
-pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -> Ast<'i> {
+pub fn extract<'i>(path: &'i str, errs: &mut Record, contents: &'i str) -> Ast<'i> {
     let contents = match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => contents,
         Err(e) => {
@@ -176,7 +178,7 @@ macro_rules! parse_amount {
 ///
 /// Sequentially validates each entry or template, records errors, accumulates the
 /// correct ones into the return value.
-pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -> Ast<'i> {
+pub fn validate<'i>(path: &'i str, errs: &mut Record, pairs: Pairs<'i>) -> Ast<'i> {
     let mut ast = Vec::new();
     'pairs: for pair in pairs {
         match pair.as_rule() {
@@ -209,7 +211,7 @@ pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -
 /// duplicate field is present or that no field definition is missing
 fn validate_template<'i>(
     path: &'i str,
-    errs: &mut error::Record,
+    errs: &mut Record,
     pair: Pair<'i>,
 ) -> Option<(&'i str, Template<'i>)> {
     let loc = (path, pair.as_span().clone());
@@ -400,7 +402,7 @@ fn read_template_tag(pair: Pair) -> models::tag::Template {
 /// The inner operation (`validate_month`) can produce errors
 fn validate_year<'i>(
     path: &'i str,
-    errs: &mut error::Record,
+    errs: &mut Record,
     year: usize,
     pairs: Vec<Pair<'i>>,
 ) -> Vec<AstItem<'i>> {
@@ -423,7 +425,7 @@ fn validate_year<'i>(
 /// produce errors
 fn validate_month<'i>(
     path: &'i str,
-    errs: &mut error::Record,
+    errs: &mut Record,
     year: usize,
     month: Month,
     pairs: Vec<Pair<'i>>,
@@ -459,7 +461,7 @@ fn validate_month<'i>(
 /// One of the inner operations (`validate_plain_entry`) can produce errors
 fn validate_day<'i>(
     path: &'i str,
-    errs: &mut error::Record,
+    errs: &mut Record,
     date: Date,
     pairs: Vec<Pair<'i>>,
 ) -> Vec<AstItem<'i>> {
@@ -531,7 +533,7 @@ fn read_value(pair: Pair) -> Arg {
 /// definition or that there is no missing field
 fn validate_plain_entry(
     path: &str,
-    errs: &mut error::Record,
+    errs: &mut Record,
     date: Date,
     pair: Pair,
 ) -> Option<Entry> {

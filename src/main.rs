@@ -4,8 +4,7 @@ mod load;
 
 use cli::table::Table;
 use lib::{
-    date::{Date, Month, Period},
-    entry::Duration,
+    date::{Date, Month, Period, Duration},
     summary::Calendar,
 };
 
