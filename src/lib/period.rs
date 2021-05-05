@@ -53,7 +53,7 @@ impl fmt::Display for Period {
             Ok(())
         };
         let merge_month = |f: &mut fmt::Formatter| {
-            if self.0.month() == Month::Jan && self.1.month() == Month::Dec {
+            if self.0.month() == Month::Jan && self.0.day() == 1 && self.1.month() == Month::Dec && self.1.day() == 31 {
                 Ok(())
             } else if self.0.month() == self.1.month() {
                 write!(f, "-{}", self.0.month())?;
@@ -86,6 +86,9 @@ type Result<T> = std::result::Result<T, Error<Rule>>;
 #[derive(Parser)]
 #[grammar = "lib/grammar-period.pest"]
 struct PeriodParser;
+
+impl Period {
+    pub fn parse(s: &str) -> 
 
 impl FromStr for Period {
     type Err = Error<Rule>;
@@ -132,8 +135,7 @@ fn validate_period(p: Pairs) -> Result<Period> {
             let start = validate_full_date(fst)?.make(&loc, true)?;
             let snd = inner.next().unwrap();
             let loc = ("", snd.as_span().clone());
-            let end = validate_partial_date(start, snd)?
-                .make(&loc, false)?;
+            let end = validate_partial_date(start, snd)?.make(&loc, false)?;
             Ok(Period(start, end))
         }
         _ => unreachable!(),
@@ -182,7 +184,7 @@ fn validate_day_date(year: u16, month: Month, p: Pair) -> Result<TruncDate> {
     Ok(TruncDate { year, month: Some(month), day: Some(day) })
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct TruncDate {
     year: u16,
     month: Option<Month>,
@@ -245,12 +247,15 @@ mod test {
     }
 
     macro_rules! ps {
-        ( $s:expr ) => {{
+        ( $s:expr => $res:expr ) => {{
             match $s.parse::<Period>() {
-                Ok(period) => assert_eq!($s, &format!("{}", period)),
+                Ok(period) => assert_eq!(&format!("{}", period), $res),
                 Err(err) => println!("{} ->\n{}", $s, err),
             }
-        }}
+        }};
+        ( $s:expr ) => {{
+            ps!($s => $s)
+        }};
     }
 
     #[test]
@@ -272,8 +277,10 @@ mod test {
         ps!("2020-Jan-3..2023-Feb");
         ps!("2020-Jan-10..");
         ps!("..2020");
-        ps!("2020..Mar");
-        ps!("2020-Jan..15");
+        ps!("2020..Mar" => "2020-Jan..Mar");
+        ps!("2020-Jan..15" => "2020-Jan-1..15");
+        ps!("2020-Jan-15..2020" => "2020-Jan-15..Dec");
+        ps!("2020..2020" => "2020");
         ps!("..");
     }
 }
