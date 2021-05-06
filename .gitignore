@@ -1,6 +1,7 @@
 target
 book
 TODO
+*.svg
 
 # *.bil files may contain sensitive information
 *.bil
