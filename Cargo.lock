@@ -14,6 +14,7 @@ dependencies = [
  "num-traits",
  "pest",
  "pest_derive",
+ "svg",
 ]
 
 [[package]]
@@ -177,6 +178,12 @@ dependencies = [
  "fake-simd",
  "opaque-debug",
 ]
+
+[[package]]
+name = "svg"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a95656b5b37251de210aa2751d538b6f31ce375bacf725a32223bfa6344e0776"
 
 [[package]]
 name = "syn"

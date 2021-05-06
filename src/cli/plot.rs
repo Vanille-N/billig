@@ -14,7 +14,7 @@ impl<'d> Plotter<'d> {
     }
 
     pub fn print_cumulative_plot(&self) {
-        println!("{:?}", self.cumulative_plot());
+        println!("{:?}", self.cumulative_plot().to_range_group_drawer().render("img.svg"));
     }
 
     fn cumulative_plot(&self) -> Plot<Period, CumulativeEntry<Amount>> {
@@ -98,3 +98,115 @@ where
             .collect::<Vec<_>>()
     }
 }
+
+impl<X, Y> Plot<X, Y>
+where
+    X: ScalarRange,
+    Y: ScalarGroup,
+{
+    fn to_range_group_drawer(&self) -> RangeGroupDrawer {
+        RangeGroupDrawer {
+            points: self.data.iter()
+            .map(|(x, y)| (x.to_range(), y.to_group()))
+            .collect::<Vec<_>>(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RangeGroupDrawer {
+    points: Vec<((i64, i64), Vec<i64>)>,
+}
+
+use svg::{
+    Document,
+    node::element::{Path, Line, path::Data},
+};
+
+impl RangeGroupDrawer {
+    fn render(&self, file: &str) {
+        let (xmin, ymin, width, height) = {
+            let mut xmin = i64::MAX;
+            let mut ymin = i64::MAX;
+            let mut xmax = i64::MIN;
+            let mut ymax = i64::MIN;
+            for ((start, end), points) in &self.points {
+                xmin = xmin.min(*start).min(*end);
+                xmax = xmax.max(*start).max(*end);
+                for pt in points {
+                    ymin = ymin.min(*pt);
+                    ymax = ymax.max(*pt);
+                }
+            }
+            (xmin, ymin, xmax - xmin, ymax - ymin)
+        };
+        let xmul = height * 3;
+        let ymul = width * 2;
+        let resize_x = |x| {
+            (x - xmin) * xmul
+        };
+        let resize_y = |y| {
+            (height - (y - ymin)) * ymul
+        };
+        let mut groups = Vec::new();
+        let group_size = self.points[0].1.len();
+        for i in 0..group_size-1 {
+            groups.push(Data::new().move_to((resize_x(self.points[0].0.0), resize_y(self.points[0].1[i]))));
+        }
+        let groups = self.points.iter()
+            .fold(groups, |gr, ((start, end), points)| {
+                gr.into_iter()
+                    .enumerate()
+                    .map(|(i, gr)| gr.line_to((resize_x(*start), resize_y(points[i])))
+                                .line_to((resize_x(*end), resize_y(points[i])))
+                    )
+                    .collect::<Vec<_>>()
+            });
+        let groups = self.points.iter().rev()
+            .fold(groups, |gr, ((start, end), points)| {
+                gr.into_iter()
+                    .enumerate()
+                    .map(|(i, gr)| gr.line_to((resize_x(*end), resize_y(points[i+1])))
+                        .line_to((resize_x(*start), resize_y(points[i+1])))
+                        )
+                    .collect::<Vec<_>>()
+            });
+        let paths = groups.into_iter()
+            .enumerate()
+            .map(|(i, gr)| Path::new()
+                .set("fill", COLORS[i])
+                .set("d", gr.close()));
+        let yaxis = Line::new()
+            .set("x1", 0)
+            .set("x2", 0)
+            .set("y1", 0)
+            .set("y2", height * ymul)
+            .set("stroke", "black")
+            .set("stroke-width", 20 * ymul);
+        let xaxis = Line::new()
+            .set("x1", 0)
+            .set("x2", width * xmul)
+            .set("y1", resize_y(0))
+            .set("y2", resize_y(0))
+            .set("stroke", "black")
+            .set("stroke-width", 20 * ymul);
+        let document = paths.into_iter()
+            .fold(Document::new(), |doc, path| {
+                doc.add(path)
+            })
+            .add(yaxis)
+            .add(xaxis)
+            .set("viewBox", (-10*xmul, -10*ymul, width * xmul, height * ymul));
+        svg::save(file, &document).unwrap();
+    }
+}
+
+const COLORS: &[&str] = &[
+    "red",
+    "green",
+    "blue",
+    "yellow",
+    "orange",
+    "purple",
+    "cyan",
+];
