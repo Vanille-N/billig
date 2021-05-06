@@ -2,7 +2,10 @@ mod cli;
 mod lib;
 mod load;
 
-use cli::table::Table;
+use cli::{
+    table::Table,
+    plot::Plotter,
+};
 use lib::{
     date::{Date, Month, Period, Duration},
     summary::Calendar,
@@ -29,9 +32,10 @@ fn main() {
         let table_week = Table::from(cal_week.contents()).with_title("Weekly");
         let table_month = Table::from(cal_month.contents()).with_title("Monthly");
         let table_year = Table::from(cal_year.contents()).with_title("Yearly");
-        println!("{}", table_week);
-        println!("{}", table_month);
-        println!("{}", table_year);
+        //println!("{}", table_week);
+        //println!("{}", table_month);
+        //println!("{}", table_year);
+        Plotter::from(cal_week.contents()).print_cumulative_plot();
     }
 }
 
