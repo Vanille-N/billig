@@ -2,12 +2,9 @@ mod cli;
 mod lib;
 mod load;
 
-use cli::{
-    table::Table,
-    plot::Plotter,
-};
+use cli::{plot::Plotter, table::Table};
 use lib::{
-    date::{Date, Month, Period, Duration},
+    date::{Date, Duration, Month, Period},
     summary::Calendar,
 };
 
@@ -38,5 +35,3 @@ fn main() {
         Plotter::from(cal_week.contents()).print_cumulative_plot();
     }
 }
-
-

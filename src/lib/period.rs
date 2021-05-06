@@ -3,9 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::lib::{
-    date::{Date, DateError, Month},
-};
+use crate::lib::date::{Date, DateError, Month};
 
 /// `Period(a, b)` is the range of dates from `a` to `b` inclusive
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,7 +54,11 @@ impl fmt::Display for Period {
             Ok(())
         };
         let merge_month = |f: &mut fmt::Formatter| {
-            if self.0.month() == Month::Jan && self.0.day() == 1 && self.1.month() == Month::Dec && self.1.day() == 31 {
+            if self.0.month() == Month::Jan
+                && self.0.day() == 1
+                && self.1.month() == Month::Dec
+                && self.1.day() == 31
+            {
                 Ok(())
             } else if self.0.month() == self.1.month() {
                 write!(f, "-{}", self.0.month())?;
@@ -77,9 +79,9 @@ impl fmt::Display for Period {
     }
 }
 
+use crate::load::error::{Error, Loc};
 use pest::Parser;
 use pest_derive::*;
-use crate::load::error::{Error, Loc};
 
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
@@ -169,7 +171,10 @@ fn validate_full_date(p: Pair) -> Result<TruncDate> {
     let mut inner = p.into_inner().into_iter();
     let year = inner.next().unwrap().as_str().parse::<u16>().unwrap();
     match inner.next() {
-        None => Ok(TruncDate { year, ..Default::default() }),
+        None => Ok(TruncDate {
+            year,
+            ..Default::default()
+        }),
         Some(month) => validate_month_date(year, month),
     }
 }
@@ -187,24 +192,30 @@ fn validate_month_date(year: u16, p: Pair) -> Result<TruncDate> {
     let mut inner = p.into_inner().into_iter();
     let month = inner.next().unwrap();
     let loc = ("", month.as_span().clone());
-    let month = month.as_str().parse::<Month>()
-        .ok()
-        .ok_or_else(|| {
-            let mut err = Error::new("Invalid Month");
-            err.span(&loc, "provided here")
-                .text(format!("'{}' is not a valid month", month.as_str()))
-                .hint("Months are 'Jan', 'Feb', ..., 'Dec'");
-            err
-        })?;
+    let month = month.as_str().parse::<Month>().ok().ok_or_else(|| {
+        let mut err = Error::new("Invalid Month");
+        err.span(&loc, "provided here")
+            .text(format!("'{}' is not a valid month", month.as_str()))
+            .hint("Months are 'Jan', 'Feb', ..., 'Dec'");
+        err
+    })?;
     match inner.next() {
-        None => Ok(TruncDate { year, month: Some(month), ..Default::default() }),
+        None => Ok(TruncDate {
+            year,
+            month: Some(month),
+            ..Default::default()
+        }),
         Some(day) => validate_day_date(year, month, day),
     }
 }
 
 fn validate_day_date(year: u16, month: Month, p: Pair) -> Result<TruncDate> {
     let day = p.as_str().parse::<u8>().unwrap();
-    Ok(TruncDate { year, month: Some(month), day: Some(day) })
+    Ok(TruncDate {
+        year,
+        month: Some(month),
+        day: Some(day),
+    })
 }
 
 #[derive(Default, Debug)]
@@ -217,8 +228,12 @@ struct TruncDate {
 impl TruncDate {
     fn make(&self, loc: &Loc, starting: bool) -> Result<Date> {
         let year = self.year;
-        let month = self.month.unwrap_or(if starting { Month::Jan } else { Month::Dec });
-        let day = self.day.unwrap_or(if starting { 1 } else { month.count(year) });
+        let month = self
+            .month
+            .unwrap_or(if starting { Month::Jan } else { Month::Dec });
+        let day = self
+            .day
+            .unwrap_or(if starting { 1 } else { month.count(year) });
         match Date::from(year as usize, month, day as usize) {
             Ok(date) => Ok(date),
             Err(e) => {

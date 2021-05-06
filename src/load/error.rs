@@ -97,10 +97,11 @@ pub struct Record<Rule: RuleType> {
     contents: Vec<Error<Rule>>,
 }
 
-impl <Rule: RuleRename> Error<Rule> {
+impl<Rule: RuleRename> Error<Rule> {
     /// Add a pre-existing error (e.g. to build from a parsing error)
     pub fn from(&mut self, err: pest::error::Error<Rule>) -> &mut Self {
-        self.items.push(Item::Block(err.renamed_rules(|r| r.rule_rename())));
+        self.items
+            .push(Item::Block(err.renamed_rules(|r| r.rule_rename())));
         self
     }
 }
@@ -123,7 +124,6 @@ impl<Rule: RuleType> Error<Rule> {
         self.fatal = false;
         self
     }
-
 
     /// Add a code block and its associated message
     pub fn span<S>(&mut self, loc: &Loc, msg: S) -> &mut Self

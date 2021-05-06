@@ -11,7 +11,6 @@ type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 /// Wrapper around Pest's `Pairs`
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
-
 use crate::lib::{
     date::{Date, Month},
     entry::{self, Amount, Category, Entry, Span, Tag},
@@ -531,12 +530,7 @@ fn read_value(pair: Pair) -> Arg {
 ///
 /// This can fail since the grammar can't ensure that there is no duplicate field
 /// definition or that there is no missing field
-fn validate_plain_entry(
-    path: &str,
-    errs: &mut Record,
-    date: Date,
-    pair: Pair,
-) -> Option<Entry> {
+fn validate_plain_entry(path: &str, errs: &mut Record, date: Date, pair: Pair) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value = Once::new("val", "42.69", &loc);
     let mut cat = Once::new("type", "Food", &loc);

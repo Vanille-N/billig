@@ -1,5 +1,5 @@
 use crate::lib::{
-    date::{Period, Date},
+    date::{Date, Period},
     entry::{Amount, Category},
     summary::Summary,
 };
@@ -10,9 +10,7 @@ pub struct Plotter<'d> {
 
 impl<'d> Plotter<'d> {
     pub fn from(data: &'d [Summary]) -> Self {
-        Self {
-            data,
-        }
+        Self { data }
     }
 
     pub fn print_cumulative_plot(&self) {
@@ -35,9 +33,7 @@ pub struct Plot<X, Y> {
 
 impl<X, Y> Plot<X, Y> {
     pub fn new() -> Self {
-        Self {
-            data: Vec::new(),
-        }
+        Self { data: Vec::new() }
     }
 
     fn push(&mut self, x: X, y: Y) {
@@ -51,7 +47,9 @@ struct CumulativeEntry<Y> {
 }
 
 impl<Y> CumulativeEntry<Y>
-where Y: std::ops::AddAssign + Clone {
+where
+    Y: std::ops::AddAssign + Clone,
+{
     fn cumul(mut points: Vec<Y>) -> Self {
         for i in 1..points.len() {
             let prev = points[i - 1].clone();
@@ -90,9 +88,12 @@ impl ScalarRange for Period {
 }
 
 impl<Y> ScalarGroup for CumulativeEntry<Y>
-where Y: Scalar {
+where
+    Y: Scalar,
+{
     fn to_group(&self) -> Vec<i64> {
-        self.points.iter()
+        self.points
+            .iter()
             .map(|p| p.to_scalar())
             .collect::<Vec<_>>()
     }

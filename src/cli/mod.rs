@@ -1,2 +1,2 @@
-pub mod table;
 pub mod plot;
+pub mod table;

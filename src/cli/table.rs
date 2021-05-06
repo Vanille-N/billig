@@ -38,7 +38,9 @@ impl<'d> Table<'d> {
     }
 
     pub fn with_title<S>(mut self, s: S) -> Self
-    where S: ToString {
+    where
+        S: ToString,
+    {
         self.title = s.to_string();
         self
     }
@@ -89,7 +91,9 @@ impl<'d> Table<'d> {
 
 impl BoxFmt {
     fn from<S>(text: S) -> Self
-    where S: ToString {
+    where
+        S: ToString,
+    {
         let text = text.to_string();
         let width = text.len();
         Self {
@@ -288,12 +292,22 @@ impl Statistics {
 
     pub fn make_shader(mut self) -> Shader {
         let make_deciles = |v: &mut Vec<f64>, reverse: bool| {
-            v.sort_by(|a, b| if reverse { a.partial_cmp(b) } else { b.partial_cmp(a) }.unwrap_or(std::cmp::Ordering::Less));
+            v.sort_by(|a, b| {
+                if reverse {
+                    a.partial_cmp(b)
+                } else {
+                    b.partial_cmp(a)
+                }
+                .unwrap_or(std::cmp::Ordering::Less)
+            });
             (0..=10)
                 .map(|i| *v.get(v.len().saturating_sub(1) * i / 10).unwrap_or(&0.0))
                 .collect::<Vec<_>>()
         };
-        Shader::with_steps(make_deciles(&mut self.negative, true), make_deciles(&mut self.positive, false))
+        Shader::with_steps(
+            make_deciles(&mut self.negative, true),
+            make_deciles(&mut self.positive, false),
+        )
     }
 }
 
@@ -343,11 +357,13 @@ impl Shader {
             let nb = v.len();
             let max = shades.len();
             let indexer = |i| (max - 1) * i / (nb - 1);
-            let mut arr = v.into_iter()
+            let mut arr = v
+                .into_iter()
                 .enumerate()
                 .map(|(i, f)| (f, shades[indexer(i)]))
                 .collect::<Vec<_>>();
-            let delta = arr.get(0).map(|(f, _)| *f).unwrap_or(0.0) - arr.last().map(|(f, _)| *f).unwrap_or(0.0);
+            let delta = arr.get(0).map(|(f, _)| *f).unwrap_or(0.0)
+                - arr.last().map(|(f, _)| *f).unwrap_or(0.0);
             if let Some(f) = arr.get_mut(0) {
                 f.0 += delta;
             }
@@ -368,9 +384,7 @@ impl Shader {
         } else {
             &self.negative
         };
-        let contains = |b, (lo, hi)| {
-            (lo < b && b <= hi) || (hi < b && b <= lo)
-        };
+        let contains = |b, (lo, hi)| (lo < b && b <= hi) || (hi < b && b <= lo);
         for w in chooser.windows(2) {
             if contains(data, (w[0].0, w[1].0)) {
                 return w[0].1;

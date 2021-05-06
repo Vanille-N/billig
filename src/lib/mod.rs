@@ -3,6 +3,6 @@
 //! Date management, entry definition and aggregation
 
 pub mod date;
-pub mod period;
 pub mod entry;
+pub mod period;
 pub mod summary;
