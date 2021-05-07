@@ -140,13 +140,15 @@ impl RangeGroupDrawer {
             }
             (xmin, ymin, xmax - xmin, ymax - ymin)
         };
-        let xmul = height * 3;
-        let ymul = width * 2;
+        let fheight = 700.0;
+        let fwidth = 1000.0;
+        let stroke_width = 2.0;
+        let margin = 20.0;
         let resize_x = |x| {
-            (x - xmin) * xmul
+            (x - xmin) as f64 / width as f64 * fwidth
         };
         let resize_y = |y| {
-            (height - (y - ymin)) * ymul
+            (height - (y - ymin)) as f64 / height as f64 * fheight
         };
         let mut groups = Vec::new();
         let group_size = self.points[0].1.len();
@@ -177,26 +179,26 @@ impl RangeGroupDrawer {
                 .set("fill", COLORS[i])
                 .set("d", gr.close()));
         let yaxis = Line::new()
-            .set("x1", 0)
-            .set("x2", 0)
-            .set("y1", 0)
-            .set("y2", height * ymul)
+            .set("x1", 0.0)
+            .set("x2", 0.0)
+            .set("y1", 0.0)
+            .set("y2", fheight)
             .set("stroke", "black")
-            .set("stroke-width", 20 * ymul);
+            .set("stroke-width", stroke_width);
         let xaxis = Line::new()
-            .set("x1", 0)
-            .set("x2", width * xmul)
+            .set("x1", 0.0)
+            .set("x2", fwidth)
             .set("y1", resize_y(0))
             .set("y2", resize_y(0))
             .set("stroke", "black")
-            .set("stroke-width", 20 * ymul);
+            .set("stroke-width", stroke_width);
         let document = paths.into_iter()
             .fold(Document::new(), |doc, path| {
                 doc.add(path)
             })
             .add(yaxis)
             .add(xaxis)
-            .set("viewBox", (-10*xmul, -10*ymul, width * xmul, height * ymul));
+            .set("viewBox", (-margin, -margin, fwidth + 2.0 * margin, fheight + 2.0 * margin));
         svg::save(file, &document).unwrap();
     }
 }
