@@ -73,8 +73,10 @@ entry = { ( expand_entry | plain_entry ) ~ semicolon }
 
 // only supports years for the range 2000-3000 in the validator anyway
 marker_year = @{ digit{4} }
-marker_month = @{ "Jan" | "Feb" | "Mar" | "Apr" | "May" | "Jun" | "Jul" | "Aug" | "Sep" | "Oct" | "Nov" | "Dec" }
-marker_day = @{ digit{2} } // days are required to be padded to 2 digits
+uppercase = _{ 'A'..'Z' }
+lowercase = _{ 'a'..'z' }
+marker_month = @{ uppercase ~ lowercase+ }
+marker_day = @{ digit{1,2} } // days are required to be padded to 2 digits
 
 // e.g.:
 // 2020:
@@ -157,12 +159,39 @@ template_descriptor = {
 }
 
 ////////////////
+// -- Period --
+
+month_date = { marker_month ~ ( "-" ~ marker_day )? }
+full_date = { marker_year ~ ( "-" ~ month_date )? }
+partial_date = _{
+    full_date
+  | month_date
+  | marker_day
+}
+
+period_after = { full_date ~ ".." }
+period_before = { ".." ~ full_date? }
+period_between = { full_date ~ ".." ~ partial_date }
+
+period = _{
+    period_between
+  | period_after
+  | period_before
+  | full_date
+}
+
+period_only = _{
+    SOI ~ period ~ EOI
+}
+
+////////////////
 // -- Global --
 
 item = _{
     template_descriptor
   | entries_year
 } 
+
 program = _{
     SOI
   ~ (
@@ -172,3 +201,4 @@ program = _{
     )*
   ~ ("EOF" | EOI)
 }
+

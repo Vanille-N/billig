@@ -59,13 +59,13 @@ where
     }
 }
 
-trait Scalar {
+pub trait Scalar {
     fn to_scalar(&self) -> i64;
 }
-trait ScalarRange {
+pub trait ScalarRange {
     fn to_range(&self) -> (i64, i64);
 }
-trait ScalarGroup {
+pub trait ScalarGroup {
     fn to_group(&self) -> Vec<i64>;
 }
 

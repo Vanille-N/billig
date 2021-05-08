@@ -16,8 +16,6 @@ use crate::lib::{
 };
 use crate::load::{error, parse::ast};
 
-type Record = error::Record<crate::load::parse::Rule>;
-
 /// Convenient exports
 pub mod models {
     pub use super::{Arg, Instance, Template};
@@ -177,7 +175,7 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate(errs: &mut Record, items: ast::Ast<'_>) -> (Vec<Entry>, Period) {
+pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>, Period) {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
     let mut period = Period::unbounded();
@@ -213,7 +211,7 @@ pub fn instanciate(errs: &mut Record, items: ast::Ast<'_>) -> (Vec<Entry>, Perio
 /// - check correct typing of val contents
 /// - perform summation of value
 fn instanciate_item(
-    errs: &mut Record,
+    errs: &mut error::Record,
     instance: Instance<'_>,
     date: Date,
     templates: &HashMap<String, Template>,
@@ -242,7 +240,7 @@ fn instanciate_item(
 /// - insert default values for named arguments
 /// - overwrite with provided values
 fn build_arguments<'i>(
-    errs: &mut Record,
+    errs: &mut error::Record,
     inst: &Instance<'i>,
     templ: &Template<'i>,
 ) -> Option<HashMap<String, Arg<'i>>> {
@@ -288,7 +286,7 @@ fn build_arguments<'i>(
 ///
 /// Also checks for unused arguments and needless typing constraints
 fn perform_replacements(
-    errs: &mut Record,
+    errs: &mut error::Record,
     inst: &Instance,
     templ: &Template,
     args: HashMap<String, Arg>,
@@ -335,7 +333,7 @@ fn perform_replacements(
 ///
 /// Returns the final amount and a `HashSet` of used arguments
 fn instantiate_amount(
-    errs: &mut Record,
+    errs: &mut error::Record,
     inst: &Instance,
     templ: &Template,
     args: &HashMap<String, Arg>,
@@ -382,7 +380,7 @@ fn instantiate_amount(
 ///
 /// Returns the final tag and a `HashSet` of used arguments
 fn instanciate_tag(
-    errs: &mut Record,
+    errs: &mut error::Record,
     inst: &Instance,
     templ: &Template,
     args: &HashMap<String, Arg>,

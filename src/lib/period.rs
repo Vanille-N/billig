@@ -83,13 +83,10 @@ use crate::load::error::{Error, Loc};
 use pest::Parser;
 use pest_derive::*;
 
+use crate::load::parse::Rule;
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
-type Result<T> = std::result::Result<T, Error<Rule>>;
-
-#[derive(Parser)]
-#[grammar = "lib/grammar-period.pest"]
-struct PeriodParser;
+type Result<T> = std::result::Result<T, Error>;
 
 impl Period {
     pub fn unbounded() -> Self {
@@ -116,10 +113,10 @@ impl Period {
 }
 
 impl FromStr for Period {
-    type Err = Error<Rule>;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Period> {
-        let contents = match PeriodParser::parse(Rule::period, s) {
+        let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
                 let mut err = Error::new("Parsing failure");
@@ -135,11 +132,11 @@ fn validate_period(p: Pairs) -> Result<Period> {
     let inner = p.into_iter().next().unwrap();
     let loc = ("", inner.as_span().clone());
     match inner.as_rule() {
-        Rule::after => {
+        Rule::period_after => {
             let trunc = validate_full_date(inner.into_inner().into_iter().next().unwrap())?;
             Ok(Period(trunc.make(&loc, true)?, Date::MAX))
         }
-        Rule::before => {
+        Rule::period_before => {
             let end = inner.into_inner().into_iter().next();
             match end {
                 Some(end) => {
@@ -153,7 +150,7 @@ fn validate_period(p: Pairs) -> Result<Period> {
             let trunc = validate_full_date(inner)?;
             Ok(Period(trunc.make(&loc, true)?, trunc.make(&loc, false)?))
         }
-        Rule::range => {
+        Rule::period_between => {
             let mut inner = inner.into_inner().into_iter();
             let fst = inner.next().unwrap();
             let loc = ("", fst.as_span().clone());
@@ -183,7 +180,7 @@ fn validate_partial_date(default: Date, p: Pair) -> Result<TruncDate> {
     match p.as_rule() {
         Rule::full_date => validate_full_date(p),
         Rule::month_date => validate_month_date(default.year(), p),
-        Rule::day => validate_day_date(default.year(), default.month(), p),
+        Rule::marker_day => validate_day_date(default.year(), default.month(), p),
         _ => unreachable!("{:?}", p),
     }
 }

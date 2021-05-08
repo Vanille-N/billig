@@ -6,7 +6,7 @@ pub fn read_entries(
     filename: &str,
 ) -> (
     Option<Vec<crate::lib::entry::Entry>>,
-    error::Record<parse::Rule>,
+    error::Record,
     crate::lib::date::Period,
 ) {
     let contents = std::fs::read_to_string(&filename).expect("File not found");

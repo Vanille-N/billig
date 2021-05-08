@@ -35,13 +35,13 @@
 //!  |      ? hint: remove argument or use in template
 //! ```
 
-use pest::RuleType;
-
 /// Location of an error
 ///
 /// Contains information on the file in which the error
 /// occured and the precise span within that file
 pub type Loc<'i> = (&'i str, pest::Span<'i>);
+
+use crate::load::parse::Rule;
 
 /// Report for a single error
 ///
@@ -63,18 +63,18 @@ pub type Loc<'i> = (&'i str, pest::Span<'i>);
 /// ```
 #[must_use]
 #[derive(Debug)]
-pub struct Error<Rule: RuleType> {
+pub struct Error {
     /// determines the error label (warning/error) and the color (yellow/red)
     fatal: bool,
     /// name of the error
     label: String,
     /// at which point of the contents is the counter
-    items: Vec<Item<Rule>>,
+    items: Vec<Item>,
 }
 
 /// Kinds of items that can be added to an error report
 #[derive(Debug)]
-enum Item<Rule: RuleType> {
+enum Item {
     /// code block
     Block(pest::error::Error<Rule>),
     /// important message
@@ -90,23 +90,23 @@ enum Item<Rule: RuleType> {
 /// spatial or semantic relationship between these errors
 #[must_use]
 #[derive(Debug)]
-pub struct Record<Rule: RuleType> {
+pub struct Record {
     /// how many are errors in the rest are warnings
     /// counts only `contents[..contents.len()-2]`
     fatal: usize,
-    contents: Vec<Error<Rule>>,
+    contents: Vec<Error>,
 }
 
-impl<Rule: RuleRename> Error<Rule> {
+impl Error {
     /// Add a pre-existing error (e.g. to build from a parsing error)
     pub fn from(&mut self, err: pest::error::Error<Rule>) -> &mut Self {
         self.items
-            .push(Item::Block(err.renamed_rules(|r| r.rule_rename())));
+            .push(Item::Block(err.renamed_rules(rule_rename)));
         self
     }
 }
 
-impl<Rule: RuleType> Error<Rule> {
+impl Error {
     /// Create a new error
     pub fn new<S>(msg: S) -> Self
     where
@@ -161,7 +161,7 @@ impl<Rule: RuleType> Error<Rule> {
     }
 }
 
-impl<Rule: RuleType> Record<Rule> {
+impl Record {
     /// Initialize a new pool of errors (e.g. to record errors from another file)
     pub fn new() -> Self {
         Self {
@@ -190,7 +190,7 @@ impl<Rule: RuleType> Record<Rule> {
     }
 
     /// Add a new error to the pool
-    pub fn make<S>(&mut self, msg: S) -> &mut Error<Rule>
+    pub fn make<S>(&mut self, msg: S) -> &mut Error
     where
         S: ToString,
     {
@@ -209,7 +209,7 @@ const WHITE: &str = "\x1b[0;1m";
 const NONE: &str = "\x1b[0m";
 
 use std::fmt;
-impl<Rule: RuleType> fmt::Display for Error<Rule> {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let (color, header) = if self.fatal {
             (RED, "--> Error")
@@ -262,7 +262,7 @@ impl<Rule: RuleType> fmt::Display for Error<Rule> {
     }
 }
 
-impl<Rule: RuleType> fmt::Display for Record<Rule> {
+impl fmt::Display for Record {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.contents.is_empty() {
             return Ok(());
@@ -305,93 +305,72 @@ impl<Rule: RuleType> fmt::Display for Record<Rule> {
     }
 }
 
-/// Convert rule names to user-friendly information about their purpose
-pub trait RuleRename: RuleType {
-    fn rule_rename(self) -> String {
-        format!("{:?}", self)
-    }
-}
-
-impl RuleRename for crate::load::parse::Rule {
-    fn rule_rename(self) -> String {
-        use crate::load::parse::Rule::*;
-        String::from(match self {
-            EOI => "EOF",
-            COMMENT => "a comment",
-            digit => "a digit (0..9)",
-            number => "a number",
-            nonzero => "a non-null number",
-            comma => "a comma (',') separator",
-            whitespace => "at least one whitespace",
-            semicolon => "a semicolon (';') separator",
-            colon => "a colon (':') separator",
-            marker_year => "a year marker ('YYYY:')",
-            marker_month => "a month marker ('Jan:' ... 'Dec:')",
-            marker_day => "a day marker ('DD:')",
-            money_amount => "a monetary value ('XXX.XX')",
-            tag_text => "a tag ('\"foo\"')",
-            string => "a string of non-'\"' characters",
-            identifier => "an identifier composed of a..zA..Z-_",
-            expense_type => "one of Pay, Food, Tech, Mov, Pro, Clean, Home",
-            span_duration => "one of Day, Week, Month, Year",
-            span_window => "one of Ante, Pred, Curr, Succ, Post",
-            span_value => "a number",
-            entry_val => "a 'val' field descriptor",
-            entry_type => "a 'type' field descriptor",
-            entry_span => "a 'span' field descriptor",
-            entry_tag => "a 'tag' field descriptor",
-            entry_item => "any field descriptor",
-            positional_arg => "a value for a positional argument",
-            named_arg => "a name=value named argument pair",
-            arguments => "a sequence of whitespace-separated argument instances",
-            expand_entry => "a template expansion",
-            plain_entry => "an entry composed of field descriptors",
-            entry => "an explicit entry or a template expansion",
-            entries_day => "a sequence of entries for the same day",
-            entries_month => "a sequence of entries for the same month",
-            entries_year => "a sequence of entries for the same year",
-            template_time => "one of @Day, @Month, @Year, @Date, @Weekday",
-            template_arg_expand => "an argument expansion &foo",
-            template_value => "a monetary value or an argument expansion",
-            template_string => "a tag or an argument expansion or a builtin date indicator",
-            template_value_args => "arguments for a summation builtin",
-            template_string_args => "arguments for the @Concat builtin",
-            builtin_neg => "the negation of a value",
-            builtin_sum => "a summation of values",
-            template_money_amount => "a template for the 'val' field",
-            builtin_concat => "a concatenation of strings",
-            template_val => "a 'val' field template descriptor",
-            template_tag => "a 'tag' field template descriptor",
-            template_entry => "a field descriptor",
-            template_expansion_contents => "a sequence of field descriptors",
-            template_positional_arg => "a positional template argument",
-            template_named_arg => "a named template argument with a default value",
-            template_args => "a sequence of template arguments",
-            template_descriptor => "a template description",
-            item => "a template description or a sequence of entries",
-            program => "a sequence of template descriptions or sequences of entries",
+fn rule_rename(r: &Rule) -> String {
+        String::from(match r {
+            Rule::EOI => "EOF",
+            Rule::COMMENT => "a comment",
+            Rule::digit => "a digit (0..9)",
+            Rule::number => "a number",
+            Rule::nonzero => "a non-null number",
+            Rule::comma => "a comma (',') separator",
+            Rule::whitespace => "at least one whitespace",
+            Rule::semicolon => "a semicolon (';') separator",
+            Rule::colon => "a colon (':') separator",
+            Rule::marker_year => "a year marker ('YYYY:')",
+            Rule::marker_month => "a month marker ('Jan:' ... 'Dec:')",
+            Rule::marker_day => "a 1- or 2-digit day number",
+            Rule::money_amount => "a monetary value ('XXX.XX')",
+            Rule::tag_text => "a tag ('\"foo\"')",
+            Rule::string => "a string of non-'\"' characters",
+            Rule::identifier => "an identifier composed of a..zA..Z-_",
+            Rule::expense_type => "one of Pay, Food, Tech, Mov, Pro, Clean, Home",
+            Rule::span_duration => "one of Day, Week, Month, Year",
+            Rule::span_window => "one of Ante, Pred, Curr, Succ, Post",
+            Rule::span_value => "a number",
+            Rule::entry_val => "a 'val' field descriptor",
+            Rule::entry_type => "a 'type' field descriptor",
+            Rule::entry_span => "a 'span' field descriptor",
+            Rule::entry_tag => "a 'tag' field descriptor",
+            Rule::entry_item => "any field descriptor",
+            Rule::positional_arg => "a value for a positional argument",
+            Rule::named_arg => "a name=value named argument pair",
+            Rule::arguments => "a sequence of whitespace-separated argument instances",
+            Rule::expand_entry => "a template expansion",
+            Rule::plain_entry => "an entry composed of field descriptors",
+            Rule::entry => "an explicit entry or a template expansion",
+            Rule::entries_day => "a sequence of entries for the same day",
+            Rule::entries_month => "a sequence of entries for the same month",
+            Rule::entries_year => "a sequence of entries for the same year",
+            Rule::template_time => "one of @Day, @Month, @Year, @Date, @Weekday",
+            Rule::template_arg_expand => "an argument expansion &foo",
+            Rule::template_value => "a monetary value or an argument expansion",
+            Rule::template_string => "a tag or an argument expansion or a builtin date indicator",
+            Rule::template_value_args => "arguments for a summation builtin",
+            Rule::template_string_args => "arguments for the @Concat builtin",
+            Rule::builtin_neg => "the negation of a value",
+            Rule::builtin_sum => "a summation of values",
+            Rule::template_money_amount => "a template for the 'val' field",
+            Rule::builtin_concat => "a concatenation of strings",
+            Rule::template_val => "a 'val' field template descriptor",
+            Rule::template_tag => "a 'tag' field template descriptor",
+            Rule::template_entry => "a field descriptor",
+            Rule::template_expansion_contents => "a sequence of field descriptors",
+            Rule::template_positional_arg => "a positional template argument",
+            Rule::template_named_arg => "a named template argument with a default value",
+            Rule::template_args => "a sequence of template arguments",
+            Rule::template_descriptor => "a template description",
+            Rule::item => "a template description or a sequence of entries",
+            Rule::program => "a sequence of template descriptions or sequences of entries",
+            Rule::uppercase => "an uppercase letter (start of a month name)",
+            Rule::lowercase => "a lowercase letter (rest of a month name)",
+            Rule::month_date => "a date Mmm-DD or Mmm",
+            Rule::full_date => "a date YYYY-Mmm-DD or YYYY-Mmm or YYYY",
+            Rule::partial_date => "a date YYYY-Mmm-DD or YYYY-Mmm or YYYY or Mmm-DD or Mmm or DD",
+            Rule::period_after => "a period [start..]",
+            Rule::period_before => "a period [..end?]",
+            Rule::period_between => "a period [start..end]",
+            Rule::period => "a period [start?..end?]",
+            Rule::period_only => "a period [start?..end?]",
         })
     }
-}
 
-impl RuleRename for crate::lib::period::Rule {
-    fn rule_rename(self) -> String {
-        use crate::lib::period::Rule::*;
-        String::from(match self {
-            EOI => "EOF",
-            digit => "a digit 0..9",
-            year => "a 4-digit year number",
-            day => "a 1- or 2-digit day number",
-            uppercase => "an uppercase letter (start of a month name)",
-            lowercase => "a lowercase letter (rest of a month name)",
-            month => "a month name",
-            month_date => "a date Mmm-DD or Mmm",
-            full_date => "a date YYYY-Mmm-DD or YYYY-Mmm or YYYY",
-            partial_date => "a date YYYY-Mmm-DD or YYYY-Mmm or YYYY or Mmm-DD or Mmm or DD",
-            after => "a period [start..]",
-            before => "a period [..end?]",
-            range => "a period [start..end]",
-            period => "a period [start?..end?]",
-        })
-    }
-}
