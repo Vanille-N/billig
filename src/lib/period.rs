@@ -3,7 +3,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use crate::lib::date::{Date, DateError, Month};
+use crate::lib::date::{Date, Month};
 
 /// `Period(a, b)` is the range of dates from `a` to `b` inclusive
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,7 +81,6 @@ impl fmt::Display for Period {
 
 use crate::load::error::{Error, Loc};
 use pest::Parser;
-use pest_derive::*;
 
 use crate::load::parse::Rule;
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
@@ -151,7 +150,7 @@ fn validate_period(p: Pairs) -> Result<Period> {
             Ok(Period(trunc.make(&loc, true)?, trunc.make(&loc, false)?))
         }
         Rule::period_between => {
-            let mut inner = inner.into_inner().into_iter();
+            let mut inner = inner.into_inner();
             let fst = inner.next().unwrap();
             let loc = ("", fst.as_span().clone());
             let start = validate_full_date(fst)?.make(&loc, true)?;
@@ -165,7 +164,7 @@ fn validate_period(p: Pairs) -> Result<Period> {
 }
 
 fn validate_full_date(p: Pair) -> Result<TruncDate> {
-    let mut inner = p.into_inner().into_iter();
+    let mut inner = p.into_inner();
     let year = inner.next().unwrap().as_str().parse::<u16>().unwrap();
     match inner.next() {
         None => Ok(TruncDate {
@@ -186,7 +185,7 @@ fn validate_partial_date(default: Date, p: Pair) -> Result<TruncDate> {
 }
 
 fn validate_month_date(year: u16, p: Pair) -> Result<TruncDate> {
-    let mut inner = p.into_inner().into_iter();
+    let mut inner = p.into_inner();
     let month = inner.next().unwrap();
     let loc = ("", month.as_span().clone());
     let month = month.as_str().parse::<Month>().ok().ok_or_else(|| {

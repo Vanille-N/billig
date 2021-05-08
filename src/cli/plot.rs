@@ -1,6 +1,6 @@
 use crate::lib::{
     date::{Date, Period},
-    entry::{Amount, Category},
+    entry::Amount,
     summary::Summary,
 };
 
