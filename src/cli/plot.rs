@@ -87,6 +87,13 @@ impl ScalarRange for Period {
     }
 }
 
+impl<T> ScalarRange for (T, T)
+where T: Scalar {
+    fn to_range(&self) -> (i64, i64) {
+        (self.0.to_scalar(), self.1.to_scalar())
+    }
+}
+
 impl<Y> ScalarGroup for CumulativeEntry<Y>
 where
     Y: Scalar,
