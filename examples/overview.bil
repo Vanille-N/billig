@@ -13,15 +13,15 @@
     val @Neg *value, // expands to an amount
     type Food,
     span Month<Post>,
-    tag @Concat "Food " @Year "-" @Month, // date is passed to the template as
-                                          // an implicit argument
+    tag "Food " @Year "-" @Month, // date is passed to the template as
+                                  // an implicit argument
 }
 
 !restaurant value tip=0 { // tip is an optional argument
-    val @Neg @Sum *value *tip, // total value is the sum of the two
+    val @Neg *value *tip, // total value is the sum of the two
     type Food,
     span Day,
-    tag @Concat "Restaurant " @Weekday ". " @Date " at " *place,
+    tag "Restaurant " @Weekday ". " @Date " at " *place,
                                             // this forces place to be 
                                             // passed as a named argument
 }

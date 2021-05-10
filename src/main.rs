@@ -4,7 +4,7 @@ mod load;
 
 use cli::{plot::Plotter, table::Table};
 use lib::{
-    date::{Date, Duration, Month, Period},
+    date::{Date, Duration, Month, Period, TimeFrame},
     summary::Calendar,
 };
 
@@ -13,17 +13,17 @@ fn main() {
         .nth(1)
         .unwrap_or_else(|| "../expenses.bil".to_string());
 
-    let (entries, errs, mut period) = load::read_entries(&filename);
+    let (entries, errs, mut timeframe) = load::read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
-        period.intersect(Period(
+        timeframe = timeframe.intersect(TimeFrame::Between(
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2021, Month::Sep, 1).unwrap(),
         ));
-        let mut cal_day = Calendar::from_spacing(period, Duration::Day, 1);
-        let mut cal_week = Calendar::from_spacing(period, Duration::Week, 1);
-        let mut cal_month = Calendar::from_spacing(period, Duration::Month, 1);
-        let mut cal_year = Calendar::from_spacing(period, Duration::Year, 1);
+        let mut cal_day = Calendar::from_spacing(timeframe.as_period(), Duration::Day, 1);
+        let mut cal_week = Calendar::from_spacing(timeframe.as_period(), Duration::Week, 1);
+        let mut cal_month = Calendar::from_spacing(timeframe.as_period(), Duration::Month, 1);
+        let mut cal_year = Calendar::from_spacing(timeframe.as_period(), Duration::Year, 1);
         cal_day.register(&lst);
         cal_week.register(&lst);
         cal_month.register(&lst);

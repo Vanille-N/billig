@@ -20,13 +20,16 @@ money_amount = @{ "-"? ~ digit+ ~ ( "." ~ digit{1,2} )? }
 string = @{ ( !"\"" ~ ANY )* }
 // e.g.: "foo bar"
 tag_text = _{ "\"" ~ string ~ "\"" }
+ 
+uppercase = _{ 'A'..'Z' }
+lowercase = _{ 'a'..'z' }
 
-// e.g.: abc_X 
-identifier = @{ ( 'a'..'z' | 'A'..'Z' | "_" )+ }
+identifier = @{ ( lowercase | "_" )+ }
+builtin = @{ uppercase ~ lowercase+ }
+window = @{ builtin }
+duration = @{ builtin }
+expense_type = @{ builtin }
 
-expense_type = { "Pay" | "Food" | "Tech" | "Mov" | "Pro" | "Clean" | "Home" }
-span_duration = { "Day" | "Week" | "Month" | "Year" }
-span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
 
 
 /////////////////////
@@ -34,19 +37,28 @@ span_window = { "Curr" | "Post" | "Ante" | "Succ" | "Pred" }
 
 // e.g.: Day<Post> 2
 span_value = {
-    span_duration
-  ~ ( "<" ~ span_window ~ ">" )?
-  ~ ( whitespace? ~ nonzero )?
+    duration 
+    ~ (
+        ( "<" ~ window ~ ">" ~ ( whitespace? ~ nonzero )? )
+      | ( whitespace ~ nonzero )
+    )
 }
 // e.g.: val 42.69
-entry_val = _{ "val" ~ whitespace ~ money_amount }
+entry_val = _{ ("val" ~ whitespace)? ~ money_amount }
 // e.g.: type Home
 entry_type = _{ "type" ~ whitespace ~ expense_type }
 // e.g.: span Day<Post> 2
-entry_span = _{ "span" ~ whitespace ~ span_value }
+entry_span = _{ "span" ~ whitespace ~ ( span_value | builtin ) }
 // e.g.: tag "foo"
-entry_tag = _{ "tag" ~ whitespace ~ tag_text }
-entry_item = _{ entry_val | entry_type | entry_tag | entry_span }
+entry_tag = _{ ("tag" ~ whitespace)? ~ tag_text }
+entry_item = _{
+    entry_val
+  | entry_type
+  | entry_tag
+  | entry_span
+  | span_value
+  | builtin
+}
 
 
 ////////////////////////////
@@ -73,8 +85,6 @@ entry = { ( expand_entry | plain_entry ) ~ semicolon }
 
 // only supports years for the range 2000-3000 in the validator anyway
 marker_year = @{ digit{4} }
-uppercase = _{ 'A'..'Z' }
-lowercase = _{ 'a'..'z' }
 marker_month = @{ uppercase ~ lowercase+ }
 marker_day = @{ digit{1,2} } // days are required to be padded to 2 digits
 
@@ -97,32 +107,29 @@ template_time = { "@Day" | "@Month" | "@Year" | "@Date" | "@Weekday" }
 template_arg_expand = _{ "*" ~ identifier }
 template_value = _{ money_amount | template_arg_expand }
 template_string = _{ tag_text | template_arg_expand | template_time }
-template_value_args = { ( whitespace ~ template_value )* }
-template_string_args = { ( whitespace ~ template_string )* }
+template_value_args = { ( whitespace ~ template_value )+ }
+template_string_args = { ( whitespace ~ template_string )+ }
 
-// e.g.:
-// @Sum *value 10 *supplement
-builtin_sum = { "@Sum" ~ template_value_args }
 // e.g.: @Neg *value
 builtin_neg = {
-    "@Neg" ~ whitespace?
-  ~ ( builtin_sum | template_arg_expand )
+    whitespace ~ "@Neg" ~ ( template_value_args )
 }
 template_money_amount = {
     builtin_neg
-  | builtin_sum
-  | template_arg_expand
-  | money_amount
+  | template_value_args
 }
 
-builtin_concat = { "@Concat" ~ template_string_args }
-template_val = _{ "val" ~ whitespace ~ template_money_amount } 
-template_tag = { "tag" ~ whitespace ~ ( template_string | builtin_concat ) }
+template_val = _{ "val" ~ template_money_amount } 
+template_tag = { "tag" ~ template_string_args }
 template_entry = _{
-    template_val
+      template_val
     | entry_type
     | template_tag
     | entry_span
+    | span_value
+    | entry_val
+    | entry_tag
+    | builtin
 }
 
 
@@ -172,11 +179,13 @@ partial_date = _{
 period_after = { full_date ~ ".." }
 period_before = { ".." ~ full_date? }
 period_between = { full_date ~ ".." ~ partial_date }
+period_empty = { "()" }
 
 period = _{
     period_between
   | period_after
   | period_before
+  | period_empty
   | full_date
 }
 

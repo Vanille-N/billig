@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
-    date::{Date, Period},
+    date::{self, Date, Period, TimeFrame},
     entry::{
         fields::{self, Category, Span},
         Entry,
@@ -175,15 +175,15 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>, Period) {
+pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>, TimeFrame) {
     let mut entries = Vec::new();
     let mut templates = HashMap::new();
-    let mut period = Period::unbounded();
+    let mut timeframe = date::TimeFrame::Empty;
     use ast::*;
     'ast: for item in items {
         match item {
             Item::Entry(entry) => {
-                period.unite(entry.period());
+                timeframe = timeframe.unite(entry.period().as_timeframe());
                 entries.push(entry);
             }
             Item::Template(name, body) => {
@@ -192,7 +192,7 @@ pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>
             Item::Instance(date, instance) => {
                 match instanciate_item(errs, instance, date, &templates) {
                     Some(inst) => {
-                        period.unite(inst.period());
+                        timeframe = timeframe.unite(inst.period().as_timeframe());
                         entries.push(inst);
                     }
                     None => continue 'ast,
@@ -200,7 +200,7 @@ pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>
             }
         }
     }
-    (entries, period)
+    (entries, timeframe)
 }
 
 /// Attempts template expansion

@@ -225,17 +225,38 @@ fn validate_template<'i>(
     let mut tag = Once::new("tag", "Some information", &loc);
     for sub in body.into_inner() {
         match sub.as_rule() {
+            Rule::builtin => {
+                let loc = (path, sub.as_span().clone());
+                if let Ok(c) = sub.as_str().parse::<entry::Category>() {
+                    cat.try_set(c, errs);
+                } else if let Ok(d) = sub.as_str().parse::<entry::Duration>() {
+                    span.try_set(Span::from(d, entry::Window::Posterior, 1), errs);
+                } else {
+                    errs.make("Invalid builtin of ambiguous nature")
+                        .span(&loc, "provided here")
+                        .text("This keyword is not recognized")
+                        .hint("maybe you meant one of Food, Com, Mov, Home, ...")
+                        .hint("or maybe try Day, Week, Month, Year");
+                    return None;
+                }
+            }
             Rule::template_money_amount => {
                 value.try_set(read_template_amount(subrule!(sub)), errs);
             }
             Rule::expense_type => {
-                cat.try_set(read_cat(sub), errs);
+                cat.try_set(validate_cat(path, errs, sub)?, errs);
             }
             Rule::span_value => {
-                span.try_set(read_span(sub), errs);
+                span.try_set(validate_span(path, errs, sub)?, errs);
             }
             Rule::template_tag => {
                 tag.try_set(read_template_tag(subrule!(sub)), errs);
+            }
+            Rule::money_amount => {
+                value.try_set(read_template_amount(sub), errs);
+            }
+            Rule::string => {
+                tag.try_set(read_template_tag(sub), errs);
             }
             _ => unreachable!(),
         }
@@ -310,10 +331,7 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
     };
-    let items = match pair.as_rule() {
-        Rule::builtin_sum => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
-        _ => vec![pair],
-    };
+    let items = pair.into_inner().into_iter().collect::<Vec<_>>();
     use models::amount::*;
     let mut sum = Template::new(sign);
     for item in items {
@@ -329,39 +347,55 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
 }
 
 /// Parse an expense category
-///
-/// Grammar ensures this cannot fail, as all categories have keyword status
-fn read_cat(pair: Pair) -> Category {
-    pair.as_str().parse::<entry::Category>().unwrap()
+fn validate_cat(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Category> {
+    let loc = (path, pair.as_span().clone());
+    match pair.as_str().parse::<entry::Category>() {
+        Ok(category) => Some(category),
+        Err(()) => {
+            errs.make("Invalid category")
+                .span(&loc, "provided here")
+                .text(format!("'{}' is not a valid expense type", pair.as_str()))
+                .hint("use one of Home, Food, Move, Tech, Pay, Pro");
+            None
+        }
+    }
 }
 
 /// Parse a span (length, window, count)
-///
-/// Grammar ensures this cannot fail, as lengths and windows are keywords,
-/// and counts are a subset of valid unsigned integers
-fn read_span(pair: Pair) -> Span {
+fn validate_span(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Span> {
     let mut pair = pair.into_inner().into_iter().peekable();
-    let duration = pair
-        .next()
-        .unwrap()
-        .as_str()
-        .parse::<entry::Duration>()
-        .unwrap();
-    let window = pair
-        .peek()
-        .map(|it| {
-            if it.as_rule() == Rule::span_window {
-                Some(it.as_str().parse::<entry::Window>().unwrap())
-            } else {
-                None
+    let item_dur = pair.next().unwrap();
+    let loc = (path, item_dur.as_span().clone());
+    let duration = match item_dur.as_str().parse::<entry::Duration>() {
+        Ok(dur) => dur,
+        Err(()) => {
+            errs.make("Invalid duration")
+                .span(&loc, "provided here")
+                .text(format!("'{}' is not a valid duration", item_dur.as_str()))
+                .hint("use one of Day, Week, Month, Year");
+            return None;
+        }
+    };
+    println!("{:?}", pair.peek());
+    let has_window = pair.peek().map(|it| it.as_rule() == Rule::window).unwrap_or(false);
+    let window = if has_window {
+        let win_rule = pair.next().unwrap();
+        let loc = (path, win_rule.as_span().clone());
+        match win_rule.as_str().parse::<entry::Window>() {
+            Ok(win) => win,
+            Err(()) => {
+                errs.make("Invalid window")
+                    .span(&loc, "provided here")
+                    .text(format!("'{}' is not a valid window", win_rule.as_str()))
+                    .hint("use one of Curr, Ante, Pred, Post, Succ");
+                return None;
             }
-        })
-        .flatten();
-    if window.is_some() {
-        pair.next();
-    }
+        }
+    } else {
+        entry::Window::Posterior
+    };
     let count = pair.next().map(|it| parse_usize!(it)).unwrap_or(1);
-    Span::from(duration, window.unwrap_or(entry::Window::Posterior), count)
+    Some(Span::from(duration, window, count))
 }
 
 /// Parse a template item that expands to a tag
@@ -371,8 +405,6 @@ fn read_span(pair: Pair) -> Span {
 /// have keyword status
 fn read_template_tag(pair: Pair) -> models::tag::Template {
     let concat = match pair.as_rule() {
-        Rule::builtin_concat => subrule!(pair).into_inner().into_iter().collect::<Vec<_>>(),
-        Rule::string => vec![pair],
         _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
     };
     use models::tag::*;
@@ -408,7 +440,16 @@ fn validate_year<'i>(
     for pair in pairs {
         assert_eq!(pair.as_rule(), Rule::entries_month);
         let (month, rest) = decapitate!(pair);
-        let month = month.as_str().parse::<Month>().unwrap(); // validated by the grammar
+        let loc = (path, month.as_span().clone());
+        let month = match month.as_str().parse::<Month>() {
+            Ok(month) => month,
+            Err(()) => {
+                errs.make("Invalid month")
+                    .span(&loc, "provided here")
+                    .hint("Months are 'Jan', 'Feb', ..., 'Dec'");
+                continue;
+            }
+        };
         let items = validate_month(path, errs, year, month, rest.collect::<Vec<_>>());
         for item in items {
             v.push(item);
@@ -443,7 +484,7 @@ fn validate_month<'i>(
             }
             Err(e) => {
                 errs.make("Invalid date")
-                    .span(&loc, "defined here")
+                    .span(&loc, "provided here")
                     .text(format!("{}", e))
                     .hint("choose a date that exists")
                     .hint(e.fix_hint());
@@ -537,14 +578,29 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
     let mut tag = Once::new("tag", "Some information", &loc);
     for item in pair.into_inner() {
         match item.as_rule() {
+            Rule::builtin => {
+                if let Ok(c) = item.as_str().parse::<entry::Category>() {
+                    cat.try_set(c, errs);
+                } else if let Ok(d) = item.as_str().parse::<entry::Duration>() {
+                    span.try_set(Span::from(d, entry::Window::Posterior, 1), errs);
+                } else {
+                    errs.make("Invalid builtin of ambiguous nature")
+                        .span(&loc, "provided here")
+                        .text("This keyword is not recognized")
+                        .hint("maybe you meant one of Food, Com, Mov, Home, ...")
+                        .hint("or maybe try Day, Week, Month, Year");
+                    return None;
+                }
+
+            }
             Rule::money_amount => {
                 value.try_set(parse_amount!(item), errs);
             }
             Rule::expense_type => {
-                cat.try_set(read_cat(item), errs);
+                cat.try_set(validate_cat(path, errs, item)?, errs);
             }
             Rule::span_value => {
-                span.try_set(read_span(item), errs);
+                span.try_set(validate_span(path, errs, item)?, errs);
             }
             Rule::string => {
                 tag.try_set(Tag(item.as_str().to_string()), errs);
