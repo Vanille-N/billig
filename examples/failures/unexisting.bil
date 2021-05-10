@@ -1,0 +1,28 @@
+!foo {
+    type Quux,
+    val 0,
+    span Month<Curr>,
+    tag "",
+}
+
+!bar {
+    type Food,
+    val 0,
+    span Baz<Curr>,
+    tag "",
+}
+!baz {
+    type Food,
+    val 0,
+    span Day<Eggs>,
+    tag "",
+}
+
+2020:
+    Jeb:
+        14: !empty;
+    Mar:
+         1:
+            type Foo, val 0, span Day, tag "";
+            type Food, val 0, span Bar, tag "";
+            type Food, val 0, span Day<Frob>, tag ""; 

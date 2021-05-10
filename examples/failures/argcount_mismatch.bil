@@ -1,8 +1,8 @@
 !num one two three extra="foo" {
-    val @Sum *one *two *three,
+    val *one *two *three,
     type Food,
     span Year<Post> 10,
-    tag @Concat "before " *extra " after",
+    tag "before " *extra " after",
 }
 
 2020:

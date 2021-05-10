@@ -1,6 +1,6 @@
 // let's just create many different errors
 !sum a b c=0 {
-    val @Sum *a *b *c,
+    val *a *b *c,
     type Home,
     span Day,
     tag "",

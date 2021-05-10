@@ -1,5 +1,5 @@
 !sum a b="foo" {
-    val @Sum *a *b,
+    val *a *b,
     type Food,
     span Day,
     tag "",

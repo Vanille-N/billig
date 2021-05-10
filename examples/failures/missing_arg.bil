@@ -1,5 +1,5 @@
 !empty {
-    val @Sum *foo,
+    val *foo,
     type Food,
     span Day,
     tag *bar,
