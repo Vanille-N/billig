@@ -9,6 +9,48 @@ use crate::lib::date::{Date, Month};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Period(pub Date, pub Date);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeFrame {
+    Between(Date, Date),
+    After(Date),
+    Before(Date),
+    Empty,
+    Unbounded,
+}
+
+impl TimeFrame {
+    pub fn as_period(self) -> Period {
+        use TimeFrame::*;
+        let (start, end) = match self {
+            Between(start, end) => (start, end),
+            After(start) => (start, Date::MAX),
+            Before(end) => (Date::MIN, end),
+            Empty => (Date::MAX, Date::MIN),
+            Unbounded => (Date::MIN, Date::MAX),
+        };
+        Period(start, end)
+    }
+}
+
+impl Period {
+    pub fn as_timeframe(self) -> TimeFrame {
+        use TimeFrame::*;
+        if self.0 > self.1 {
+            Empty
+        } else if self.0 == Date::MIN {
+            if self.1 == Date::MAX {
+                Unbounded
+            } else {
+                Before(self.1)
+            }
+        } else if self.1 == Date::MAX {
+            After(self.0)
+        } else {
+            Between(self.0, self.1)
+        }
+    }
+}
+
 impl fmt::Display for Period {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let merge_day = |f: &mut fmt::Formatter| {
@@ -75,139 +117,182 @@ impl fmt::Display for Period {
                 shorten_year(f)
             }
         };
-        merge_year(f)
+        if self.0 <= self.1 {
+            merge_year(f)
+        } else {
+            write!(f, "()")
+        }
     }
 }
 
-use crate::load::error::{Error, Loc};
+use crate::load::error::{self, Loc};
 use pest::Parser;
 
 use crate::load::parse::Rule;
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
-type Result<T> = std::result::Result<T, Error>;
 
-impl Period {
-    pub fn unbounded() -> Self {
-        Self(Date::MIN, Date::MAX)
+impl TimeFrame {
+    pub fn normalized(self) -> Self {
+        if let TimeFrame::Between(start, end) = self {
+            if start > end {
+                return TimeFrame::Empty;
+            }
+        }
+        self
     }
 
-    pub fn unite(&mut self, other: Self) {
-        if self.0 == Date::MIN || other.0 < self.0 {
-            self.0 = other.0;
-        }
-        if self.1 == Date::MAX || other.1 > self.1 {
-            self.1 = other.1;
-        }
+    pub fn intersect(self, other: Self) -> Self {
+        use TimeFrame::*;
+        match (self, other) {
+            (_, Empty) | (Empty, _) => Empty,
+            (lhs, Unbounded) => lhs,
+            (Unbounded, rhs) => rhs,
+            (Between(start1, end1), Between(start2, end2)) => Between(start1.max(start2), end1.min(end2)),
+            (After(start1), Between(start2, end2)) => Between(start1.max(start2), end2),
+            (Before(end1), Between(start2, end2)) => Between(start2, end1.min(end2)),
+            (Between(start1, end1), After(start2)) => Between(start1.max(start2), end1),
+            (Between(start1, end1), Before(end2)) => Between(start1, end1.min(end2)),
+            (After(start1), After(start2)) => After(start1.max(start2)),
+            (After(start1), Before(end2)) => Between(start1, end2),
+            (Before(end1), After(start2)) => Between(start2, end1),
+            (Before(end1), Before(end2)) => Before(end1.min(end2)),
+        }.normalized()
     }
 
-    pub fn intersect(&mut self, other: Self) {
-        if self.0 == Date::MIN || other.0 > self.0 {
-            self.0 = other.0;
-        }
-        if self.1 == Date::MAX || other.1 < self.1 {
-            self.1 = other.1;
-        }
+    pub fn unite(self, other: Self) -> Self {
+        use TimeFrame::*;
+        match (self, other) {
+            (_, Unbounded) | (Unbounded, _) => Unbounded,
+            (lhs, Empty) => lhs,
+            (Empty, rhs) => rhs,
+            (Between(start1, end1), Between(start2, end2)) => Between(start1.min(start2), end1.max(end2)),
+            (After(start1), Between(start2, end2)) => Between(start1.min(start2), end2),
+            (Before(end1), Between(start2, end2)) => Between(start2, end1.max(end2)),
+            (Between(start1, end1), After(start2)) => Between(start1.min(start2), end1),
+            (Between(start1, end1), Before(end2)) => Between(start1, end1.max(end2)),
+            (After(start1), After(start2)) => After(start1.min(start2)),
+            (After(start1), Before(end2)) => Between(start1, end2),
+            (Before(end1), After(start2)) => Between(start2, end1),
+            (Before(end1), Before(end2)) => Before(end1.max(end2)),
+        }.normalized()
     }
 }
 
-impl FromStr for Period {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Period> {
+impl TimeFrame {
+    pub fn parse(errs: &mut error::Record, s: &str) -> Option<TimeFrame> {
         let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
-                let mut err = Error::new("Parsing failure");
-                err.from(e);
-                return Err(err);
+                errs.make("Parsing failure")
+                    .from(e);
+                return None;
             }
         };
-        validate_period(contents)
+        let res = validate_timeframe(errs, contents);
+        if errs.is_fatal() {
+            None
+        } else {
+            res
+        }
     }
 }
 
-fn validate_period(p: Pairs) -> Result<Period> {
+fn validate_timeframe(errs: &mut error::Record, p: Pairs) -> Option<TimeFrame> {
     let inner = p.into_iter().next().unwrap();
     let loc = ("", inner.as_span().clone());
     match inner.as_rule() {
         Rule::period_after => {
-            let trunc = validate_full_date(inner.into_inner().into_iter().next().unwrap())?;
-            Ok(Period(trunc.make(&loc, true)?, Date::MAX))
+            let trunc = validate_full_date(errs, inner.into_inner().into_iter().next().unwrap())?;
+            Some(TimeFrame::After(trunc.make(errs, &loc, true)?))
         }
         Rule::period_before => {
             let end = inner.into_inner().into_iter().next();
             match end {
                 Some(end) => {
-                    let trunc = validate_full_date(end)?;
-                    Ok(Period(Date::MIN, trunc.make(&loc, false)?))
+                    let trunc = validate_full_date(errs, end)?;
+                    Some(TimeFrame::Before(trunc.make(errs, &loc, false)?))
                 }
-                None => Ok(Period(Date::MIN, Date::MAX)),
+                None => Some(TimeFrame::Unbounded),
             }
         }
         Rule::full_date => {
-            let trunc = validate_full_date(inner)?;
-            Ok(Period(trunc.make(&loc, true)?, trunc.make(&loc, false)?))
+            let trunc = validate_full_date(errs, inner)?;
+            Some(TimeFrame::Between(trunc.make(errs, &loc, true)?, trunc.make(errs, &loc, false)?))
         }
         Rule::period_between => {
             let mut inner = inner.into_inner();
             let fst = inner.next().unwrap();
             let loc = ("", fst.as_span().clone());
-            let start = validate_full_date(fst)?.make(&loc, true)?;
+            let start = validate_full_date(errs, fst)?.make(errs, &loc, true)?;
             let snd = inner.next().unwrap();
             let loc = ("", snd.as_span().clone());
-            let end = validate_partial_date(start, snd)?.make(&loc, false)?;
-            Ok(Period(start, end))
+            let end = validate_partial_date(errs, start, snd)?.make(errs, &loc, false)?;
+            if start <= end {
+                Some(TimeFrame::Between(start, end))
+            } else {
+                errs.make("End before start of timeframe")
+                    .span(&loc, "this timeframe")
+                    .text("Timeframe is empty")
+                    .hint("If this is intentionnal consider using '()' instead");
+                Some(TimeFrame::Empty)
+            }
+        }
+        Rule::period_empty => {
+            Some(TimeFrame::Empty)
         }
         _ => unreachable!(),
     }
 }
 
-fn validate_full_date(p: Pair) -> Result<TruncDate> {
+fn validate_full_date(errs: &mut error::Record, p: Pair) -> Option<TruncDate> {
     let mut inner = p.into_inner();
     let year = inner.next().unwrap().as_str().parse::<u16>().unwrap();
     match inner.next() {
-        None => Ok(TruncDate {
+        None => Some(TruncDate {
             year,
             ..Default::default()
         }),
-        Some(month) => validate_month_date(year, month),
+        Some(month) => validate_month_date(errs, year, month),
     }
 }
 
-fn validate_partial_date(default: Date, p: Pair) -> Result<TruncDate> {
+fn validate_partial_date(errs: &mut error::Record, default: Date, p: Pair) -> Option<TruncDate> {
     match p.as_rule() {
-        Rule::full_date => validate_full_date(p),
-        Rule::month_date => validate_month_date(default.year(), p),
-        Rule::marker_day => validate_day_date(default.year(), default.month(), p),
+        Rule::full_date => validate_full_date(errs, p),
+        Rule::month_date => validate_month_date(errs, default.year(), p),
+        Rule::marker_day => validate_day_date(errs, default.year(), default.month(), p),
         _ => unreachable!("{:?}", p),
     }
 }
 
-fn validate_month_date(year: u16, p: Pair) -> Result<TruncDate> {
+fn validate_month_date(errs: &mut error::Record, year: u16, p: Pair) -> Option<TruncDate> {
     let mut inner = p.into_inner();
     let month = inner.next().unwrap();
     let loc = ("", month.as_span().clone());
-    let month = month.as_str().parse::<Month>().ok().ok_or_else(|| {
-        let mut err = Error::new("Invalid Month");
-        err.span(&loc, "provided here")
-            .text(format!("'{}' is not a valid month", month.as_str()))
-            .hint("Months are 'Jan', 'Feb', ..., 'Dec'");
-        err
-    })?;
+    let month = match month.as_str().parse::<Month>() {
+        Ok(month) => month,
+        Err(()) => {
+            errs.make("Invalid Month")
+                .span(&loc, "provided here")
+                .text(format!("'{}' is not a valid month", month.as_str()))
+                .hint("Months are 'Jan', 'Feb', ..., 'Dec'");
+            return None;
+        }
+    };
     match inner.next() {
-        None => Ok(TruncDate {
+        None => Some(TruncDate {
             year,
             month: Some(month),
             ..Default::default()
         }),
-        Some(day) => validate_day_date(year, month, day),
+        Some(day) => validate_day_date(errs, year, month, day),
     }
 }
 
-fn validate_day_date(year: u16, month: Month, p: Pair) -> Result<TruncDate> {
+fn validate_day_date(errs: &mut error::Record, year: u16, month: Month, p: Pair) -> Option<TruncDate> {
     let day = p.as_str().parse::<u8>().unwrap();
-    Ok(TruncDate {
+    Some(TruncDate {
         year,
         month: Some(month),
         day: Some(day),
@@ -222,7 +307,7 @@ struct TruncDate {
 }
 
 impl TruncDate {
-    fn make(&self, loc: &Loc, starting: bool) -> Result<Date> {
+    fn make(&self, errs: &mut error::Record, loc: &Loc, starting: bool) -> Option<Date> {
         let year = self.year;
         let month = self
             .month
@@ -231,14 +316,14 @@ impl TruncDate {
             .day
             .unwrap_or(if starting { 1 } else { month.count(year) });
         match Date::from(year as usize, month, day as usize) {
-            Ok(date) => Ok(date),
+            Ok(date) => Some(date),
             Err(e) => {
-                let mut err = Error::new("Invalid date");
-                err.span(loc, "provided here")
+                errs.make("Invalid date")
+                    .span(loc, "provided here")
                     .text(format!("{}", e))
                     .hint("choose a date that exists")
                     .hint(e.fix_hint());
-                Err(err)
+                None
             }
         }
     }
@@ -282,9 +367,9 @@ mod test {
 
     macro_rules! ps {
         ( $s:expr => $res:expr ) => {{
-            match $s.parse::<Period>() {
-                Ok(period) => assert_eq!(&format!("{}", period), $res),
-                Err(err) => println!("{} ->\n{}", $s, err),
+            match Period::parse(&mut error::Record::new(), $s) {
+                Some(period) => assert_eq!(&format!("{}", period), $res),
+                None => println!("{} ->\n{}", $s, err),
             }
         }};
         ( $s:expr ) => {{

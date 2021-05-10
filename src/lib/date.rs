@@ -12,7 +12,7 @@ use num_traits::FromPrimitive;
 use std::fmt;
 use std::str::FromStr;
 
-pub use crate::lib::{entry::Duration, period::Period};
+pub use crate::lib::{entry::Duration, period::{Period, TimeFrame}};
 
 /// A date with day-precision
 ///
