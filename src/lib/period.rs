@@ -1,7 +1,6 @@
 //! An inclusive range of dates
 
 use std::fmt;
-use std::str::FromStr;
 
 use crate::lib::date::{Date, Month};
 
@@ -237,7 +236,6 @@ impl PartialPeriod {
 
 fn validate_partial_period(errs: &mut error::Record, p: Pairs) -> Option<PartialPeriod> {
     let inner = p.into_iter().next().unwrap();
-    let loc = ("", inner.as_span().clone());
     match inner.as_rule() {
         Rule::period_after => {
             let trunc = validate_partial_date(errs, inner.into_inner().into_iter().next().unwrap())?;
@@ -260,10 +258,8 @@ fn validate_partial_period(errs: &mut error::Record, p: Pairs) -> Option<Partial
         Rule::period_between => {
             let mut inner = inner.into_inner();
             let fst = inner.next().unwrap();
-            let loc = ("", fst.as_span().clone());
             let start = validate_partial_date(errs, fst)?;
             let snd = inner.next().unwrap();
-            let loc = ("", snd.as_span().clone());
             let end = validate_partial_date(errs, snd)?;
             Some(PartialPeriod::Between(start, end))
         }
@@ -419,55 +415,80 @@ mod test {
     }
 
     macro_rules! ps {
-        ( $s:expr => $res:expr ) => {{
+        ( $s:tt, $b:tt, $res:tt ) => {{
             let mut err = crate::load::error::Record::new();
             match PartialPeriod::parse(&mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
-                Some(period) => assert_eq!(&format!("{}", period.as_period()), $res),
-                None => println!("{} ->\n{}", $s, err),
+                Some(period) => {
+                    if !$b { panic!("{} instead of a failure\nHelp: this should be rejected", period.as_period()); }
+                    assert_eq!(&format!("{}", period.as_period()), $res);
+                }
+                None => {
+                    if $b { panic!("{} instead of a success\nHelp: this should be accepted", err); }
+                    let fmt = format!("{:?}", err);
+                    if !fmt.contains($res) {
+                        panic!("{} should contain {}\nHelp: this should be rejected for a different reason", err, $res);
+                    }
+                }
             }
         }};
-        ( $s:expr ) => {{
-            ps!($s => $s)
+        ( idem $s:tt ) => {{
+            ps!($s, true, $s)
+        }};
+        ( $s:tt ok $res:tt ) => {{
+            ps!($s, true, $res)
+        }};
+        ( $s:tt fail $res:tt ) => {{
+            ps!($s, false, $res)
         }};
     }
 
     #[test]
     fn period_parse() {
-        ps!("2020-Jan-15..2021-Mar-17");
-        ps!("2020-Jan-15..Mar-17");
-        ps!("2020-Jan-15..17");
-        ps!("2020-Jan-15");
-        ps!("2020-Jan");
-        ps!("2020-Jan-1..15");
-        ps!("2020-Jan-15..31");
-        ps!("2020-Jan..Feb-15");
-        ps!("2020-Jan..Feb");
-        ps!("2020..2021-Mar-17");
-        ps!("2020-Feb-3..2021");
-        ps!("2020..2021-Mar");
-        ps!("2020");
-        ps!("2020..2023");
-        ps!("2020-Jan-3..2023-Feb");
-        ps!("2020-Jan-10..");
-        ps!("..2020");
-        ps!("2020..");
-        ps!("2020..Mar" => "2020-Jan..Mar");
-        ps!("2020-Jan..15" => "2020-Jan-1..15");
-        ps!("2020-Jan-15..2020" => "2020-Jan-15..Dec");
-        ps!("2020..2020" => "2020");
-        ps!("..");
-        ps!("..Feb-15" => "..2021-Feb-15");
-        ps!("Mar.." => "2021-Mar..");
-        ps!("..Mar" => "..2021-Mar");
-        ps!("15.." => "2021-Feb-15..");
-        ps!("..15" => "..2021-Feb-15");
-        ps!("17..21" => "2021-Feb-17..21");
-        ps!("17..Mar-1" => "2021-Feb-17..Mar-1");
-        ps!("Mar-13..17" => "2021-Mar-13..17");
-        ps!("Mar-13..2021" => "2021-Mar-13..Dec");
-        ps!("Mar-13..Oct" => "2021-Mar-13..Oct");
-        ps!("15" => "2021-Feb-15");
-        ps!("Jan" => "2021-Jan");
-        ps!("Jan-15" => "2021-Jan-15");
+        ps!(idem "2020-Jan-15..2021-Mar-17");
+        ps!(idem "2020-Jan-15..Mar-17");
+        ps!(idem "2020-Jan-15..17");
+        ps!(idem "2020-Jan-15");
+        ps!(idem "2020-Jan");
+        ps!(idem "2020-Jan-1..15");
+        ps!(idem "2020-Jan-15..31");
+        ps!(idem "2020-Jan..Feb-15");
+        ps!(idem "2020-Jan..Feb");
+        ps!(idem "2020..2021-Mar-17");
+        ps!(idem "2020-Feb-3..2021");
+        ps!(idem "2020..2021-Mar");
+        ps!(idem "2020");
+        ps!(idem "2020..2023");
+        ps!(idem "2020-Jan-3..2023-Feb");
+        ps!(idem "2020-Jan-10..");
+        ps!(idem "..2020");
+        ps!(idem "2020..");
+        ps!("2020..Mar" ok "2020-Jan..Mar");
+        ps!("2020-Jan..15" ok "2020-Jan-1..15");
+        ps!("2020-Jan-15..2020" ok "2020-Jan-15..Dec");
+        ps!("2020..2020" ok "2020");
+        ps!(idem "..");
+        ps!("..Feb-15" ok "..2021-Feb-15");
+        ps!("..1" ok "..2021-Feb-1");
+        ps!("Mar.." ok "2021-Mar..");
+        ps!("..Mar" ok "..2021-Mar");
+        ps!("15.." ok "2021-Feb-15..");
+        ps!("..15" ok "..2021-Feb-15");
+        ps!("17..21" ok "2021-Feb-17..21");
+        ps!("17..Mar-1" ok "2021-Feb-17..Mar-1");
+        ps!("Mar-13..17" ok "2021-Mar-13..17");
+        ps!("Mar-13..2021" ok "2021-Mar-13..Dec");
+        ps!("Mar-13..Oct" ok "2021-Mar-13..Oct");
+        ps!("15" ok "2021-Feb-15");
+        ps!("Jan" ok "2021-Jan");
+        ps!("Jan-15" ok "2021-Jan-15");
+        ps!(idem "()");
+        ps!("..0" fail "not in the range");
+        ps!("..45" fail "not in the range");
+        ps!("Bef.." fail "not a valid month");
+        ps!("1..3..5" fail "expected EOF");
+        ps!("2020202" fail "expected EOF");
+        ps!("0000" fail "outside of the supported range");
+        ps!("Jan-20..." fail "expected EOF");
+        ps!("20..15" fail "Timeframe is empty");
     }
 }
