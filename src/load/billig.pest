@@ -48,7 +48,7 @@ entry_val = _{ ("val" ~ whitespace)? ~ money_amount }
 // e.g.: type Home
 entry_type = _{ "type" ~ whitespace ~ expense_type }
 // e.g.: span Day<Post> 2
-entry_span = _{ "span" ~ whitespace ~ ( span_value | builtin ) }
+entry_span = _{ "span" ~ whitespace ~ ( span_value | builtin | period_placeholder ) }
 // e.g.: tag "foo"
 entry_tag = _{ ("tag" ~ whitespace)? ~ tag_text }
 entry_item = _{
@@ -58,6 +58,7 @@ entry_item = _{
   | entry_span
   | span_value
   | builtin
+  | period_placeholder
 }
 
 
@@ -176,9 +177,9 @@ partial_date = _{
   | marker_day
 }
 
-period_after = { full_date ~ ".." }
-period_before = { ".." ~ full_date? }
-period_between = { full_date ~ ".." ~ partial_date }
+period_after = { partial_date ~ ".." }
+period_before = { ".." ~ partial_date? }
+period_between = { partial_date ~ ".." ~ partial_date }
 period_empty = { "()" }
 
 period = _{
@@ -186,9 +187,10 @@ period = _{
   | period_after
   | period_before
   | period_empty
-  | full_date
+  | partial_date
 }
 
+period_placeholder = { ( ".." | "-" | digit | uppercase | lowercase )+ }
 period_only = _{
     SOI ~ period ~ EOI
 }

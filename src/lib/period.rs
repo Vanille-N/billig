@@ -18,6 +18,15 @@ pub enum TimeFrame {
     Unbounded,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PartialPeriod {
+    Between(PartialDate, PartialDate),
+    After(PartialDate),
+    Before(PartialDate),
+    Empty,
+    Unbounded,
+}
+
 impl TimeFrame {
     pub fn as_period(self) -> Period {
         use TimeFrame::*;
@@ -179,8 +188,8 @@ impl TimeFrame {
     }
 }
 
-impl TimeFrame {
-    pub fn parse(errs: &mut error::Record, s: &str) -> Option<TimeFrame> {
+impl PartialPeriod {
+    pub fn parse(errs: &mut error::Record, s: &str) -> Option<PartialPeriod> {
         let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
@@ -189,84 +198,104 @@ impl TimeFrame {
                 return None;
             }
         };
-        let res = validate_timeframe(errs, contents);
+        let res = validate_partial_period(errs, contents);
         if errs.is_fatal() {
             None
         } else {
             res
         }
     }
-}
 
-fn validate_timeframe(errs: &mut error::Record, p: Pairs) -> Option<TimeFrame> {
+    pub fn make(self, errs: &mut error::Record, loc: &Loc, reference: Date) -> Option<TimeFrame> {
+        match self {
+            PartialPeriod::Empty => Some(TimeFrame::Empty),
+            PartialPeriod::Unbounded => Some(TimeFrame::Unbounded),
+            PartialPeriod::After(pdt) => Some(TimeFrame::After(pdt.default_year(reference.year()).default_month(if pdt.day.is_none() { Month::Jan } else { reference.month() }).make(errs, loc, true)?)),
+            PartialPeriod::Before(pdt) => Some(TimeFrame::Before(pdt.default_year(reference.year()).default_month(if pdt.day.is_none() { Month::Dec } else { reference.month() }).make(errs, loc, false)?)),
+            PartialPeriod::Between(start, end) => {
+                let dstart = start.default_year(reference.year()).default_month(if start.day.is_none() { Month::Jan } else { reference.month() }).make(errs, loc, true)?;
+                let dend = if end.year.is_none() {
+                    end.default_year(dstart.year()).default_month(start.month.unwrap_or(if end.day.is_none() { Month::Dec } else { reference.month() }))
+                } else {
+                    end
+                };
+                let dend = dend.make(errs, loc, false)?;
+                if dstart > dend {
+                    errs.make("End before start of timeframe")
+                        .span(&loc, "this timeframe")
+                        .text("Timeframe is empty")
+                        .hint("If this is intentionnal consider using '()' instead");
+                    None
+                } else {
+                    Some(TimeFrame::Between(dstart, dend))
+                }
+            }        
+        }
+    }
+}
+            
+
+fn validate_partial_period(errs: &mut error::Record, p: Pairs) -> Option<PartialPeriod> {
     let inner = p.into_iter().next().unwrap();
     let loc = ("", inner.as_span().clone());
     match inner.as_rule() {
         Rule::period_after => {
-            let trunc = validate_full_date(errs, inner.into_inner().into_iter().next().unwrap())?;
-            Some(TimeFrame::After(trunc.make(errs, &loc, true)?))
+            let trunc = validate_partial_date(errs, inner.into_inner().into_iter().next().unwrap())?;
+            Some(PartialPeriod::After(trunc))
         }
         Rule::period_before => {
             let end = inner.into_inner().into_iter().next();
             match end {
                 Some(end) => {
-                    let trunc = validate_full_date(errs, end)?;
-                    Some(TimeFrame::Before(trunc.make(errs, &loc, false)?))
+                    let trunc = validate_partial_date(errs, end)?;
+                    Some(PartialPeriod::Before(trunc))
                 }
-                None => Some(TimeFrame::Unbounded),
+                None => Some(PartialPeriod::Unbounded),
             }
         }
-        Rule::full_date => {
-            let trunc = validate_full_date(errs, inner)?;
-            Some(TimeFrame::Between(trunc.make(errs, &loc, true)?, trunc.make(errs, &loc, false)?))
+        Rule::partial_date | Rule::full_date | Rule::marker_day | Rule::month_date => {
+            let trunc = validate_partial_date(errs, inner)?;
+            Some(PartialPeriod::Between(trunc, trunc))
         }
         Rule::period_between => {
             let mut inner = inner.into_inner();
             let fst = inner.next().unwrap();
             let loc = ("", fst.as_span().clone());
-            let start = validate_full_date(errs, fst)?.make(errs, &loc, true)?;
+            let start = validate_partial_date(errs, fst)?;
             let snd = inner.next().unwrap();
             let loc = ("", snd.as_span().clone());
-            let end = validate_partial_date(errs, start, snd)?.make(errs, &loc, false)?;
-            if start <= end {
-                Some(TimeFrame::Between(start, end))
-            } else {
-                errs.make("End before start of timeframe")
-                    .span(&loc, "this timeframe")
-                    .text("Timeframe is empty")
-                    .hint("If this is intentionnal consider using '()' instead");
-                Some(TimeFrame::Empty)
-            }
+            let end = validate_partial_date(errs, snd)?;
+            Some(PartialPeriod::Between(start, end))
         }
         Rule::period_empty => {
-            Some(TimeFrame::Empty)
+            Some(PartialPeriod::Empty)
         }
-        _ => unreachable!(),
+        _ => unreachable!("{:?}", inner),
     }
 }
 
-fn validate_full_date(errs: &mut error::Record, p: Pair) -> Option<TruncDate> {
+fn validate_full_date(errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
     let mut inner = p.into_inner();
     let year = inner.next().unwrap().as_str().parse::<u16>().unwrap();
     match inner.next() {
-        None => Some(TruncDate {
-            year,
+        None => Some(PartialDate {
+            year: Some(year),
             ..Default::default()
         }),
-        Some(month) => validate_month_date(errs, year, month),
+        Some(month) => validate_month_date(errs, Some(year), month),
     }
 }
 
-fn validate_partial_date(errs: &mut error::Record, default: Date, p: Pair) -> Option<TruncDate> {
+fn validate_partial_date(errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
     match p.as_rule() {
         Rule::full_date => validate_full_date(errs, p),
-        Rule::month_date => validate_month_date(errs, default.year(), p),
-        Rule::marker_day => validate_day_date(errs, default.year(), default.month(), p),
+        Rule::month_date => validate_month_date(errs, None, p),
+        Rule::marker_day => validate_day_date(errs, None, None, p),
         _ => unreachable!("{:?}", p),
     }
 }
 
-fn validate_month_date(errs: &mut error::Record, year: u16, p: Pair) -> Option<TruncDate> {
+fn validate_month_date(errs: &mut error::Record, year: Option<u16>, p: Pair) -> Option<PartialDate> {
     let mut inner = p.into_inner();
     let month = inner.next().unwrap();
     let loc = ("", month.as_span().clone());
@@ -281,34 +310,57 @@ fn validate_month_date(errs: &mut error::Record, year: u16, p: Pair) -> Option<T
         }
     };
     match inner.next() {
-        None => Some(TruncDate {
+        None => Some(PartialDate {
             year,
             month: Some(month),
             ..Default::default()
         }),
-        Some(day) => validate_day_date(errs, year, month, day),
+        Some(day) => validate_day_date(errs, year, Some(month), day),
     }
 }
 
-fn validate_day_date(errs: &mut error::Record, year: u16, month: Month, p: Pair) -> Option<TruncDate> {
+fn validate_day_date(errs: &mut error::Record, year: Option<u16>, month: Option<Month>, p: Pair) -> Option<PartialDate> {
     let day = p.as_str().parse::<u8>().unwrap();
-    Some(TruncDate {
+    Some(PartialDate {
         year,
-        month: Some(month),
+        month,
         day: Some(day),
     })
 }
 
-#[derive(Default, Debug)]
-struct TruncDate {
-    year: u16,
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PartialDate {
+    year: Option<u16>,
     month: Option<Month>,
     day: Option<u8>,
 }
 
-impl TruncDate {
+impl PartialDate {
+    fn default_year(mut self, year: u16) -> Self {
+        if self.year.is_none() {
+            self.year = Some(year);
+        }
+        self
+    }
+
+    fn default_month(mut self, month: Month) -> Self {
+        if self.month.is_none() {
+            self.month = Some(month);
+        }
+        self
+    }
+
     fn make(&self, errs: &mut error::Record, loc: &Loc, starting: bool) -> Option<Date> {
-        let year = self.year;
+        let year = match self.year {
+            None => {
+                errs.make("Unspecified year")
+                    .span(loc, "provided here")
+                    .text("Impossible to guess year")
+                    .hint("add YYYY- in front to indicate year of interest");
+                return None;
+            }
+            Some(year) => year,
+        };
         let month = self
             .month
             .unwrap_or(if starting { Month::Jan } else { Month::Dec });
@@ -333,6 +385,7 @@ impl TruncDate {
 #[rustfmt::skip]
 mod test {
     use crate::lib::date::{Month::*, *};
+    use super::*;
 
     macro_rules! dt {
         ( $y:tt - $m:tt - $d:tt ) => {{
@@ -367,8 +420,9 @@ mod test {
 
     macro_rules! ps {
         ( $s:expr => $res:expr ) => {{
-            match Period::parse(&mut error::Record::new(), $s) {
-                Some(period) => assert_eq!(&format!("{}", period), $res),
+            let mut err = crate::load::error::Record::new();
+            match PartialPeriod::parse(&mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
+                Some(period) => assert_eq!(&format!("{}", period.as_period()), $res),
                 None => println!("{} ->\n{}", $s, err),
             }
         }};
@@ -396,10 +450,24 @@ mod test {
         ps!("2020-Jan-3..2023-Feb");
         ps!("2020-Jan-10..");
         ps!("..2020");
+        ps!("2020..");
         ps!("2020..Mar" => "2020-Jan..Mar");
         ps!("2020-Jan..15" => "2020-Jan-1..15");
         ps!("2020-Jan-15..2020" => "2020-Jan-15..Dec");
         ps!("2020..2020" => "2020");
         ps!("..");
+        ps!("..Feb-15" => "..2021-Feb-15");
+        ps!("Mar.." => "2021-Mar..");
+        ps!("..Mar" => "..2021-Mar");
+        ps!("15.." => "2021-Feb-15..");
+        ps!("..15" => "..2021-Feb-15");
+        ps!("17..21" => "2021-Feb-17..21");
+        ps!("17..Mar-1" => "2021-Feb-17..Mar-1");
+        ps!("Mar-13..17" => "2021-Mar-13..17");
+        ps!("Mar-13..2021" => "2021-Mar-13..Dec");
+        ps!("Mar-13..Oct" => "2021-Mar-13..Oct");
+        ps!("15" => "2021-Feb-15");
+        ps!("Jan" => "2021-Jan");
+        ps!("Jan-15" => "2021-Jan-15");
     }
 }

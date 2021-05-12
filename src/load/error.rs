@@ -367,6 +367,7 @@ fn rule_rename(r: &Rule) -> String {
             Rule::period => "a period [start?..end?]",
             Rule::period_empty => "an empty period ()",
             Rule::period_only => "a period [start?..end?]",
+            Rule::period_placeholder => "a period [start?..end?]",
             Rule::builtin => "a capitalized identifier",
             Rule::duration => "a duration Day, Week, Month or Year",
             Rule::window => "a window Curr, Post, Ante, Pred or Succ",
