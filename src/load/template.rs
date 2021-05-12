@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
-    date::{self, Date, Period, TimeFrame},
+    date::{self, Date, TimeFrame},
     entry::{
         fields::{self, Category, Span},
         Entry,

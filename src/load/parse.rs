@@ -404,9 +404,7 @@ fn validate_span(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Spa
 /// arguments are valid identifiers, and builtin placeholders (`@Day`, `@Date`, ...)
 /// have keyword status
 fn read_template_tag(pair: Pair) -> models::tag::Template {
-    let concat = match pair.as_rule() {
-        _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
-    };
+    let concat = pair.into_inner().into_iter().collect::<Vec<_>>();
     use models::tag::*;
     let mut strs = Template::new();
     for item in concat {

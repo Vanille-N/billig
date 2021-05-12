@@ -4,7 +4,7 @@ mod load;
 
 use cli::{plot::Plotter, table::Table};
 use lib::{
-    date::{Date, Duration, Month, Period, TimeFrame},
+    date::{Date, Duration, Month, TimeFrame},
     summary::Calendar,
 };
 
