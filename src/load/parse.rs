@@ -331,7 +331,10 @@ fn read_template_amount(pair: Pair) -> models::amount::Template {
         Rule::builtin_neg => (false, subrule!(pair)),
         _ => (true, pair),
     };
-    let items = pair.into_inner().into_iter().collect::<Vec<_>>();
+    let items = match pair.as_rule() {
+        Rule::money_amount => vec![pair],
+        _ => pair.into_inner().into_iter().collect::<Vec<_>>(),
+    };
     use models::amount::*;
     let mut sum = Template::new(sign);
     for item in items {
