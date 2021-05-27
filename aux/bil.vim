@@ -7,11 +7,12 @@ if exists("b:current_syntax")
     finish
 endif
 
-syn keyword bilKeyword val type span tag
+syn keyword bilKeyword val type span tag period
 syn keyword bilCategory Food Clean Home Pay Pro Tech Mov
 syn keyword bilWindow Post Curr Ante Pred Succ
 syn keyword bilDuration Day Week Month Year
 
+syn match bilPeriod '\([[:upper:]][[:lower:]][[:lower:]]\|\.\.\|[[:digit:]]\|-\)\+'
 syn match bilMoneyAmount '-\?\d\+\(.\d\d\?\)\?'
 syn match bilBuiltin '@[[:alpha:]]\+'
 syn match bilArgExpand '*\([[:alpha:]]\|_\)\+'
@@ -34,3 +35,4 @@ hi def link bilArgExpand StorageClass
 hi def link bilTemplate Identifier
 hi def link bilComment Comment
 hi def link bilMarker Todo
+hi def link bilPeriod Constant
