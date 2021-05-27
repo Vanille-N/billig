@@ -38,6 +38,38 @@ impl TimeFrame {
         };
         Period(start, end)
     }
+
+    pub fn bounded(self, errs: &mut error::Record, loc: &Loc, date: Date) -> Option<Period> {
+        let (start, end) = match self {
+            TimeFrame::Empty => {
+                errs.make("Period cannot be empty")
+                    .span(&loc, "provided here")
+                    .text("Explicit periods must have a beginning and/or an end")
+                    .hint("use START.. or ..END or START..END")
+                    .hint("for a single day simply use `span Day`");
+                return None;
+            }
+            TimeFrame::Unbounded => {
+                errs.make("Period cannot be unbounded")
+                    .span(&loc, "provided here")
+                    .text("Explicit periods must have a beginning and/or an end")
+                    .hint("use START.. or ..END or START..END")
+                    .hint("for a single day simply use `span Day`");
+                return None;
+            }
+            TimeFrame::Between(start, end) => (start, end),
+            TimeFrame::After(start) => (start, date),
+            TimeFrame::Before(end) => (date, end),
+        };
+        if start > end {
+            errs.make("Period is accidentally empty")
+                .span(&loc, "provided here")
+                .text("This period has its END smaller than START")
+                .hint("empty periods are forbidden here");
+            return None;
+        }
+        Some(Period(start, end))
+    }
 }
 
 impl Period {
@@ -188,7 +220,7 @@ impl TimeFrame {
 }
 
 impl PartialPeriod {
-    pub fn parse(errs: &mut error::Record, s: &str) -> Option<PartialPeriod> {
+    pub fn parse(path: &str, errs: &mut error::Record, s: &str) -> Option<PartialPeriod> {
         let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
@@ -197,7 +229,7 @@ impl PartialPeriod {
                 return None;
             }
         };
-        let res = validate_partial_period(errs, contents);
+        let res = validate_partial_period(path, errs, contents);
         if errs.is_fatal() {
             None
         } else {
@@ -234,33 +266,33 @@ impl PartialPeriod {
 }
             
 
-fn validate_partial_period(errs: &mut error::Record, p: Pairs) -> Option<PartialPeriod> {
+pub fn validate_partial_period(path: &str, errs: &mut error::Record, p: Pairs) -> Option<PartialPeriod> {
     let inner = p.into_iter().next().unwrap();
     match inner.as_rule() {
         Rule::period_after => {
-            let trunc = validate_partial_date(errs, inner.into_inner().into_iter().next().unwrap())?;
+            let trunc = validate_partial_date(path, errs, inner.into_inner().into_iter().next().unwrap())?;
             Some(PartialPeriod::After(trunc))
         }
         Rule::period_before => {
             let end = inner.into_inner().into_iter().next();
             match end {
                 Some(end) => {
-                    let trunc = validate_partial_date(errs, end)?;
+                    let trunc = validate_partial_date(path, errs, end)?;
                     Some(PartialPeriod::Before(trunc))
                 }
                 None => Some(PartialPeriod::Unbounded),
             }
         }
         Rule::partial_date | Rule::full_date | Rule::marker_day | Rule::month_date => {
-            let trunc = validate_partial_date(errs, inner)?;
+            let trunc = validate_partial_date(path, errs, inner)?;
             Some(PartialPeriod::Between(trunc, trunc))
         }
         Rule::period_between => {
             let mut inner = inner.into_inner();
             let fst = inner.next().unwrap();
-            let start = validate_partial_date(errs, fst)?;
+            let start = validate_partial_date(path, errs, fst)?;
             let snd = inner.next().unwrap();
-            let end = validate_partial_date(errs, snd)?;
+            let end = validate_partial_date(path, errs, snd)?;
             Some(PartialPeriod::Between(start, end))
         }
         Rule::period_empty => {
@@ -270,7 +302,7 @@ fn validate_partial_period(errs: &mut error::Record, p: Pairs) -> Option<Partial
     }
 }
 
-fn validate_full_date(errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
+fn validate_full_date(path: &str, errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
     let mut inner = p.into_inner();
     let year = inner.next().unwrap().as_str().parse::<u16>().unwrap();
     match inner.next() {
@@ -278,23 +310,23 @@ fn validate_full_date(errs: &mut error::Record, p: Pair) -> Option<PartialDate> 
             year: Some(year),
             ..Default::default()
         }),
-        Some(month) => validate_month_date(errs, Some(year), month),
+        Some(month) => validate_month_date(path, errs, Some(year), month),
     }
 }
 
-fn validate_partial_date(errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
+fn validate_partial_date(path: &str, errs: &mut error::Record, p: Pair) -> Option<PartialDate> {
     match p.as_rule() {
-        Rule::full_date => validate_full_date(errs, p),
-        Rule::month_date => validate_month_date(errs, None, p),
-        Rule::marker_day => validate_day_date(errs, None, None, p),
+        Rule::full_date => validate_full_date(path, errs, p),
+        Rule::month_date => validate_month_date(path, errs, None, p),
+        Rule::marker_day => validate_day_date(path, errs, None, None, p),
         _ => unreachable!("{:?}", p),
     }
 }
 
-fn validate_month_date(errs: &mut error::Record, year: Option<u16>, p: Pair) -> Option<PartialDate> {
+fn validate_month_date(path: &str, errs: &mut error::Record, year: Option<u16>, p: Pair) -> Option<PartialDate> {
     let mut inner = p.into_inner();
     let month = inner.next().unwrap();
-    let loc = ("", month.as_span().clone());
+    let loc = (path, month.as_span().clone());
     let month = match month.as_str().parse::<Month>() {
         Ok(month) => month,
         Err(()) => {
@@ -311,11 +343,11 @@ fn validate_month_date(errs: &mut error::Record, year: Option<u16>, p: Pair) -> 
             month: Some(month),
             ..Default::default()
         }),
-        Some(day) => validate_day_date(errs, year, Some(month), day),
+        Some(day) => validate_day_date(path, errs, year, Some(month), day),
     }
 }
 
-fn validate_day_date(errs: &mut error::Record, year: Option<u16>, month: Option<Month>, p: Pair) -> Option<PartialDate> {
+fn validate_day_date(path: &str, errs: &mut error::Record, year: Option<u16>, month: Option<Month>, p: Pair) -> Option<PartialDate> {
     let day = p.as_str().parse::<u8>().unwrap();
     Some(PartialDate {
         year,
