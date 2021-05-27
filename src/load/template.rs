@@ -321,7 +321,7 @@ fn perform_replacements(
             _ => (),
         }
     }
-    Some(Entry::from(date, value, templ.cat, templ.span, tag))
+    Some(Entry::from(value, templ.cat, templ.span.period(date), tag))
 }
 
 /// Expand amount

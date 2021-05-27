@@ -127,8 +127,7 @@ impl std::iter::Sum for Amount {
 
 impl Entry {
     /// Aggregate elements into a single entry
-    pub fn from(date: Date, value: Amount, cat: Category, span: Span, tag: Tag) -> Self {
-        let period = span.period(date);
+    pub fn from(value: Amount, cat: Category, period: Period, tag: Tag) -> Self {
         let length = period.1.index() - period.0.index() + 1;
         Self {
             value,

@@ -379,7 +379,6 @@ fn validate_span(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Spa
             return None;
         }
     };
-    println!("{:?}", pair.peek());
     let has_window = pair.peek().map(|it| it.as_rule() == Rule::window).unwrap_or(false);
     let window = if has_window {
         let win_rule = pair.next().unwrap();
@@ -583,7 +582,7 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
                 if let Ok(c) = item.as_str().parse::<entry::Category>() {
                     cat.try_set(c, errs);
                 } else if let Ok(d) = item.as_str().parse::<entry::Duration>() {
-                    span.try_set(Span::from(d, entry::Window::Posterior, 1), errs);
+                    span.try_set(Span::from(d, entry::Window::Posterior, 1).period(date), errs);
                 } else {
                     errs.make("Invalid builtin of ambiguous nature")
                         .span(&loc, "provided here")
@@ -601,17 +600,24 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
                 cat.try_set(validate_cat(path, errs, item)?, errs);
             }
             Rule::span_value => {
-                span.try_set(validate_span(path, errs, item)?, errs);
+                span.try_set(validate_span(path, errs, item)?.period(date), errs);
             }
             Rule::string => {
                 tag.try_set(Tag(item.as_str().to_string()), errs);
             }
-            _ => unreachable!(),
+            Rule::period => {
+                use crate::lib::period::{self, PartialPeriod};
+                let loc = (path, item.as_span().clone());
+                let partial_period = period::validate_partial_period(path, errs, item.into_inner())?;
+                let period = partial_period.make(errs, &loc, date)?.bounded(errs, &loc, date)?;
+                span.try_set(period, errs);
+            }
+            _ => unreachable!("{:?}", item),
         }
     }
     let value = value.try_get(errs)?;
     let cat = cat.try_get(errs)?;
     let span = span.try_get(errs)?;
     let tag = tag.try_get(errs)?;
-    Some(Entry::from(date, value, cat, span, tag))
+    Some(Entry::from(value, cat, span, tag))
 }
