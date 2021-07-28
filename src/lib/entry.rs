@@ -58,6 +58,7 @@ pub enum Category {
     Movement,
     Tech,
     Food,
+    Fun,
 }
 
 /// Generic period generator when given a reference date
@@ -88,7 +89,7 @@ pub enum Window {
 }
 
 impl Category {
-    pub const COUNT: usize = 7;
+    pub const COUNT: usize = 8;
 }
 
 use std::ops;
@@ -278,6 +279,7 @@ impl FromStr for Category {
             "Pro" => School,
             "Clean" => Cleaning,
             "Home" => Home,
+            "Fun" => Fun,
             _ => return Err(()),
         })
     }

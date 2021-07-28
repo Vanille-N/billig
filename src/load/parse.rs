@@ -42,6 +42,8 @@ pub enum AstItem<'i> {
     Instance(Date, Instance<'i>),
     /// a template definition
     Template(&'i str, Template<'i>),
+    /// an external file import
+    Import(&'i str),
 }
 
 struct Once<'i, T> {
@@ -103,14 +105,12 @@ impl<'i, T> Once<'i, T> {
 /// Caller should determine the success of this function not through its return value
 /// but by querying `errs` (e.g. by checking `errs.is_fatal()` or `errs.count_errors()`)
 pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -> Ast<'i> {
-    let contents = match BilligParser::parse(Rule::program, contents) {
-        Ok(contents) => contents,
-        Err(e) => {
-            errs.make("Parsing failure").from(e.with_path(path));
-            return Vec::new();
-        }
-    };
-    validate(path, errs, contents)
+    match BilligParser::parse(Rule::program, contents) {
+        Ok(contents) => validate(path, errs, contents),
+        Err(e) => {errs.make("Parsing failure").from(e.with_path(path));
+            Vec::new()
+    }
+    }
 }
 
 // extract contents of wrapper rule
@@ -195,6 +195,17 @@ pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -
                 for item in items {
                     ast.push(item);
                 }
+            }
+            Rule::import => {
+                ast.push(AstItem::Import(pair.into_inner().as_str()));
+                //let relative = pair.into_inner().as_str();
+                //let mut file = std::path::PathBuf::from(path);
+                //file.pop();
+                //file.push(relative);
+                //let filename = file.to_str().unwrap();
+                //let contents = std::fs::read_to_string(&file).expect(&format!("File '{}' not found", filename));
+                //println!("Reading data from '{}'", filename);
+                //extract(filename, errs, &contents, ast);
             }
             Rule::EOI => break,
             _ => unreachable!(),
@@ -358,7 +369,7 @@ fn validate_cat(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Cate
             errs.make("Invalid category")
                 .span(&loc, "provided here")
                 .text(format!("'{}' is not a valid expense type", pair.as_str()))
-                .hint("use one of Home, Food, Move, Tech, Pay, Pro");
+                .hint("use one of Home, Food, Move, Tech, Pay, Pro, Fun");
             None
         }
     }

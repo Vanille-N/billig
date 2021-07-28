@@ -196,11 +196,24 @@ period_only = _{
 }
 
 ////////////////
+// -- Import --
+
+import = {
+    "import"
+  ~ whitespace ~ path
+}
+
+path = @{
+    ( 'a'..'z' | 'A'..'Z' | "." | "/" | '0'..'9' )+
+}
+
+////////////////
 // -- Global --
 
 item = _{
     template_descriptor
   | entries_year
+  | import
 } 
 
 program = _{

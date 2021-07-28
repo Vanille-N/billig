@@ -48,7 +48,7 @@ pub enum Arg<'i> {
 }
 
 /// A description of a template
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Template<'i> {
     /// positional arguments
     positional: Vec<&'i str>,
@@ -67,11 +67,11 @@ pub struct Template<'i> {
 }
 
 /// Describes a field that expands to a tag
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag<'i>(Vec<TagItem<'i>>);
 
 /// Possible contents of a tag field expansion
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TagItem<'i> {
     /// current day number
     Day,
@@ -90,7 +90,7 @@ pub enum TagItem<'i> {
 }
 
 /// Describes a field that expands to an amount
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Amount<'i> {
     /// if `false` take the opposite
     sign: bool,
@@ -99,7 +99,7 @@ pub struct Amount<'i> {
 }
 
 /// Possible contents of an amount field expansion
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AmountItem<'i> {
     /// a numeric constant
     Cst(fields::Amount),
@@ -175,9 +175,8 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>, TimeFrame) {
+pub fn instanciate<'i>(path: &str, errs: &mut error::Record, items: ast::Ast<'i>, mut templates: HashMap<String, crate::load::template::Template<'i>>) -> (Vec<Entry>, TimeFrame) {
     let mut entries = Vec::new();
-    let mut templates = HashMap::new();
     let mut timeframe = date::TimeFrame::Empty;
     use ast::*;
     'ast: for item in items {
@@ -196,6 +195,26 @@ pub fn instanciate(errs: &mut error::Record, items: ast::Ast<'_>) -> (Vec<Entry>
                         entries.push(inst);
                     }
                     None => continue 'ast,
+                }
+            }
+            Item::Import(file) => {
+                let mut path = std::path::PathBuf::from(path);
+                path.pop();
+                path.push(file);
+                let filename = path.to_str().unwrap();
+                let contents = std::fs::read_to_string(&filename).expect(&format!("File '{}' not found", filename));
+                let data = crate::load::parse::extract(filename, errs, &contents);
+                if errs.is_fatal() {
+                    return (Vec::new(), crate::lib::date::TimeFrame::Empty);
+                }
+                let (pairs, period) = crate::load::template::instanciate(filename, errs, data, templates.clone());
+                if errs.is_fatal() {
+                    return (Vec::new(), period);
+                } else {
+                    timeframe = timeframe.unite(period);
+                    for entry in pairs {
+                        entries.push(entry);
+                    }
                 }
             }
         }

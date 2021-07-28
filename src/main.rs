@@ -20,6 +20,7 @@ fn main() {
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2021, Month::Sep, 1).unwrap(),
         ));
+        println!("{:?}", timeframe);
         let mut cal_day = Calendar::from_spacing(timeframe.as_period(), Duration::Day, 1);
         let mut cal_week = Calendar::from_spacing(timeframe.as_period(), Duration::Week, 1);
         let mut cal_month = Calendar::from_spacing(timeframe.as_period(), Duration::Month, 1);

@@ -372,6 +372,8 @@ fn rule_rename(r: &Rule) -> String {
             Rule::duration => "a duration Day, Week, Month or Year",
             Rule::window => "a window Curr, Post, Ante, Pred or Succ",
             Rule::expense_type => "an expense type Mov, Home, Tech, ...",
+            Rule::import => "an external file import",
+            Rule::path => "a file path",
         })
     }
 
