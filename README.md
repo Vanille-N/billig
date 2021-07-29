@@ -44,6 +44,10 @@ The following example gives an overview of the available constructs.
             // several entries can be registered for a single day
             // this one will last only a day, Day is the contracted form
             // of Day<Curr> 1
+        02: -40, Food, period ..Oct-15, "Misc";
+            // labels 'val', 'type', 'span', 'tag' can be omitted
+            // the 'period' construct allows for more fine-grained control
+            // over timeframes
 
 // this is a template
 !food_supplies value { // it takes a single positional argument
