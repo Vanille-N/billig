@@ -22,6 +22,11 @@ a better experience by using a specifically-designed DSL.
 
 *WIP: Billig does not yet have a command-line interface*
 
+For now, when executed it either read the first argument or look for `expenses.bil`
+in the current folder, and output weekly, monthly and yearly tables, as well as
+export an SVG graph.
+
+
 
 # Syntax
 
@@ -72,4 +77,10 @@ The following example gives an overview of the available constructs.
             // expands to:
             //   val -55, type Food, span Day,
             //   tag "Restaurant Fri. 2020-Dec-25 at Bar";
+
+import ../other.bil
+// either relative or absolute path, parses the contents of the
+// imported file in the context of the current one: local template definitions
+// are available in other.bil, but definitions from other.bil do not pollute the
+// current namespace
 ```

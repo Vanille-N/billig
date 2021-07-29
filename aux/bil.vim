@@ -18,7 +18,7 @@ syn match bilBuiltin '@[[:alpha:]]\+'
 syn match bilArgExpand '*\([[:alpha:]]\|_\)\+'
 syn match bilTemplate '!\([[:alpha:]]\|_\|-\)\+'
 syn match bilMarker '\([[:alpha:]]\+\|[[:digit:]]\+\):'
-syn match bilPath '\(.\|[[:alnum:]]\|/\)\+'
+syn match bilPath '\(\.\|[[:alnum:]]\|/\)\+\.bil'
 
 syn region bilString start=/"/ end=/"/
 syn region bilComment start=/\/\// end=/\n/
