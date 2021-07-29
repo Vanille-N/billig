@@ -621,7 +621,7 @@ fn validate_plain_entry(
                 tag.try_set(Tag(item.as_str().to_string()), errs);
             }
             Rule::period => {
-                use crate::lib::period::{self, PartialPeriod};
+                use crate::lib::period;
                 let loc = (path, item.as_span().clone());
                 let partial_period =
                     period::validate_partial_period(path, errs, item.into_inner())?;

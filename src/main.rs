@@ -11,7 +11,7 @@ use lib::{
 fn main() {
     let filename = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "../expenses.bil".to_string());
+        .unwrap_or_else(|| "expenses.bil".to_string());
 
     let (entries, errs, mut timeframe) = load::read_entries(&filename);
     println!("{}", errs);

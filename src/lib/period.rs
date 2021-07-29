@@ -353,7 +353,7 @@ fn validate_partial_date(path: &str, errs: &mut error::Record, p: Pair) -> Optio
     match p.as_rule() {
         Rule::full_date => validate_full_date(path, errs, p),
         Rule::month_date => validate_month_date(path, errs, None, p),
-        Rule::marker_day => validate_day_date(path, errs, None, None, p),
+        Rule::marker_day => validate_day_date(None, None, p),
         _ => unreachable!("{:?}", p),
     }
 }
@@ -383,13 +383,11 @@ fn validate_month_date(
             month: Some(month),
             ..Default::default()
         }),
-        Some(day) => validate_day_date(path, errs, year, Some(month), day),
+        Some(day) => validate_day_date(year, Some(month), day),
     }
 }
 
 fn validate_day_date(
-    path: &str,
-    errs: &mut error::Record,
     year: Option<u16>,
     month: Option<Month>,
     p: Pair,

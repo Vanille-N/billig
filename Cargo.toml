@@ -1,6 +1,6 @@
 [package]
 name = "billig"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Vanille-N <neven.villani@gmail.com>"]
 edition = "2018"
 description = "A command-line DSL budget manager"
