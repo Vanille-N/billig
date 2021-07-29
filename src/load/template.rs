@@ -175,7 +175,12 @@ impl<'i> Amount<'i> {
 /// Template expansion may fail without it being indicated in the returned value
 /// Caller should query `errs` to find out if all instances were correctly expanded
 /// (e.g. with `errs.is_fatal()` or `errs.count_errors()`)
-pub fn instanciate<'i>(path: &str, errs: &mut error::Record, items: ast::Ast<'i>, mut templates: HashMap<String, crate::load::template::Template<'i>>) -> (Vec<Entry>, TimeFrame) {
+pub fn instanciate<'i>(
+    path: &str,
+    errs: &mut error::Record,
+    items: ast::Ast<'i>,
+    mut templates: HashMap<String, crate::load::template::Template<'i>>,
+) -> (Vec<Entry>, TimeFrame) {
     let mut entries = Vec::new();
     let mut timeframe = date::TimeFrame::Empty;
     use ast::*;
@@ -197,17 +202,30 @@ pub fn instanciate<'i>(path: &str, errs: &mut error::Record, items: ast::Ast<'i>
                     None => continue 'ast,
                 }
             }
-            Item::Import(file) => {
+            Item::Import(file, loc) => {
                 let mut path = std::path::PathBuf::from(path);
                 path.pop();
                 path.push(file);
                 let filename = path.to_str().unwrap();
-                let contents = std::fs::read_to_string(&filename).expect(&format!("File '{}' not found", filename));
+                let contents = match std::fs::read_to_string(&filename) {
+                    Ok(contents) => contents,
+                    Err(_) => {
+                        errs.make("File not found")
+                            .span(
+                                &loc,
+                                "imported here",
+                            )
+                            .text(format!("'{}' does not exist", filename))
+                            .hint("check that the path is correct relative to the source file");
+                        continue 'ast;
+                    }
+                };
                 let data = crate::load::parse::extract(filename, errs, &contents);
                 if errs.is_fatal() {
                     return (Vec::new(), crate::lib::date::TimeFrame::Empty);
                 }
-                let (pairs, period) = crate::load::template::instanciate(filename, errs, data, templates.clone());
+                let (pairs, period) =
+                    crate::load::template::instanciate(filename, errs, data, templates.clone());
                 if errs.is_fatal() {
                     return (Vec::new(), period);
                 } else {

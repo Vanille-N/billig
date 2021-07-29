@@ -43,7 +43,7 @@ pub enum AstItem<'i> {
     /// a template definition
     Template(&'i str, Template<'i>),
     /// an external file import
-    Import(&'i str),
+    Import(&'i str, error::Loc<'i>),
 }
 
 struct Once<'i, T> {
@@ -107,9 +107,10 @@ impl<'i, T> Once<'i, T> {
 pub fn extract<'i>(path: &'i str, errs: &mut error::Record, contents: &'i str) -> Ast<'i> {
     match BilligParser::parse(Rule::program, contents) {
         Ok(contents) => validate(path, errs, contents),
-        Err(e) => {errs.make("Parsing failure").from(e.with_path(path));
+        Err(e) => {
+            errs.make("Parsing failure").from(e.with_path(path));
             Vec::new()
-    }
+        }
     }
 }
 
@@ -197,15 +198,8 @@ pub fn validate<'i>(path: &'i str, errs: &mut error::Record, pairs: Pairs<'i>) -
                 }
             }
             Rule::import => {
-                ast.push(AstItem::Import(pair.into_inner().as_str()));
-                //let relative = pair.into_inner().as_str();
-                //let mut file = std::path::PathBuf::from(path);
-                //file.pop();
-                //file.push(relative);
-                //let filename = file.to_str().unwrap();
-                //let contents = std::fs::read_to_string(&file).expect(&format!("File '{}' not found", filename));
-                //println!("Reading data from '{}'", filename);
-                //extract(filename, errs, &contents, ast);
+                let loc = (path, pair.as_span());
+                ast.push(AstItem::Import(pair.into_inner().as_str(), loc));
             }
             Rule::EOI => break,
             _ => unreachable!(),
@@ -390,7 +384,10 @@ fn validate_span(path: &str, errs: &mut error::Record, pair: Pair) -> Option<Spa
             return None;
         }
     };
-    let has_window = pair.peek().map(|it| it.as_rule() == Rule::window).unwrap_or(false);
+    let has_window = pair
+        .peek()
+        .map(|it| it.as_rule() == Rule::window)
+        .unwrap_or(false);
     let window = if has_window {
         let win_rule = pair.next().unwrap();
         let loc = (path, win_rule.as_span().clone());
@@ -581,7 +578,12 @@ fn read_value(pair: Pair) -> Arg {
 ///
 /// This can fail since the grammar can't ensure that there is no duplicate field
 /// definition or that there is no missing field
-fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: Pair) -> Option<Entry> {
+fn validate_plain_entry(
+    path: &str,
+    errs: &mut error::Record,
+    date: Date,
+    pair: Pair,
+) -> Option<Entry> {
     let loc = (path, pair.as_span().clone());
     let mut value = Once::new("val", "42.69", &loc);
     let mut cat = Once::new("type", "Food", &loc);
@@ -593,7 +595,10 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
                 if let Ok(c) = item.as_str().parse::<entry::Category>() {
                     cat.try_set(c, errs);
                 } else if let Ok(d) = item.as_str().parse::<entry::Duration>() {
-                    span.try_set(Span::from(d, entry::Window::Posterior, 1).period(date), errs);
+                    span.try_set(
+                        Span::from(d, entry::Window::Posterior, 1).period(date),
+                        errs,
+                    );
                 } else {
                     errs.make("Invalid builtin of ambiguous nature")
                         .span(&loc, "provided here")
@@ -602,7 +607,6 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
                         .hint("or maybe try Day, Week, Month, Year");
                     return None;
                 }
-
             }
             Rule::money_amount => {
                 value.try_set(parse_amount!(item), errs);
@@ -619,8 +623,11 @@ fn validate_plain_entry(path: &str, errs: &mut error::Record, date: Date, pair: 
             Rule::period => {
                 use crate::lib::period::{self, PartialPeriod};
                 let loc = (path, item.as_span().clone());
-                let partial_period = period::validate_partial_period(path, errs, item.into_inner())?;
-                let period = partial_period.make(errs, &loc, date)?.bounded(errs, &loc, date)?;
+                let partial_period =
+                    period::validate_partial_period(path, errs, item.into_inner())?;
+                let period = partial_period
+                    .make(errs, &loc, date)?
+                    .bounded(errs, &loc, date)?;
                 span.try_set(period, errs);
             }
             _ => unreachable!("{:?}", item),

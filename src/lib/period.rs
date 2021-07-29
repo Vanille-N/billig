@@ -188,7 +188,9 @@ impl TimeFrame {
             (_, Empty) | (Empty, _) => Empty,
             (lhs, Unbounded) => lhs,
             (Unbounded, rhs) => rhs,
-            (Between(start1, end1), Between(start2, end2)) => Between(start1.max(start2), end1.min(end2)),
+            (Between(start1, end1), Between(start2, end2)) => {
+                Between(start1.max(start2), end1.min(end2))
+            }
             (After(start1), Between(start2, end2)) => Between(start1.max(start2), end2),
             (Before(end1), Between(start2, end2)) => Between(start2, end1.min(end2)),
             (Between(start1, end1), After(start2)) => Between(start1.max(start2), end1),
@@ -197,7 +199,8 @@ impl TimeFrame {
             (After(start1), Before(end2)) => Between(start1, end2),
             (Before(end1), After(start2)) => Between(start2, end1),
             (Before(end1), Before(end2)) => Before(end1.min(end2)),
-        }.normalized()
+        }
+        .normalized()
     }
 
     pub fn unite(self, other: Self) -> Self {
@@ -206,7 +209,9 @@ impl TimeFrame {
             (_, Unbounded) | (Unbounded, _) => Unbounded,
             (lhs, Empty) => lhs,
             (Empty, rhs) => rhs,
-            (Between(start1, end1), Between(start2, end2)) => Between(start1.min(start2), end1.max(end2)),
+            (Between(start1, end1), Between(start2, end2)) => {
+                Between(start1.min(start2), end1.max(end2))
+            }
             (After(start1), Between(start2, end2)) => Between(start1.min(start2), end2),
             (Before(end1), Between(start2, end2)) => Between(start2, end1.max(end2)),
             (Between(start1, end1), After(start2)) => Between(start1.min(start2), end1),
@@ -215,7 +220,8 @@ impl TimeFrame {
             (After(start1), Before(end2)) => Between(start1, end2),
             (Before(end1), After(start2)) => Between(start2, end1),
             (Before(end1), Before(end2)) => Before(end1.max(end2)),
-        }.normalized()
+        }
+        .normalized()
     }
 }
 
@@ -224,8 +230,7 @@ impl PartialPeriod {
         let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
-                errs.make("Parsing failure")
-                    .from(e);
+                errs.make("Parsing failure").from(e);
                 return None;
             }
         };
@@ -241,12 +246,40 @@ impl PartialPeriod {
         match self {
             PartialPeriod::Empty => Some(TimeFrame::Empty),
             PartialPeriod::Unbounded => Some(TimeFrame::Unbounded),
-            PartialPeriod::After(pdt) => Some(TimeFrame::After(pdt.default_year(reference.year()).default_month(if pdt.day.is_none() { Month::Jan } else { reference.month() }).make(errs, loc, true)?)),
-            PartialPeriod::Before(pdt) => Some(TimeFrame::Before(pdt.default_year(reference.year()).default_month(if pdt.day.is_none() { Month::Dec } else { reference.month() }).make(errs, loc, false)?)),
+            PartialPeriod::After(pdt) => Some(TimeFrame::After(
+                pdt.default_year(reference.year())
+                    .default_month(if pdt.day.is_none() {
+                        Month::Jan
+                    } else {
+                        reference.month()
+                    })
+                    .make(errs, loc, true)?,
+            )),
+            PartialPeriod::Before(pdt) => Some(TimeFrame::Before(
+                pdt.default_year(reference.year())
+                    .default_month(if pdt.day.is_none() {
+                        Month::Dec
+                    } else {
+                        reference.month()
+                    })
+                    .make(errs, loc, false)?,
+            )),
             PartialPeriod::Between(start, end) => {
-                let dstart = start.default_year(reference.year()).default_month(if start.day.is_none() { Month::Jan } else { reference.month() }).make(errs, loc, true)?;
+                let dstart = start
+                    .default_year(reference.year())
+                    .default_month(if start.day.is_none() {
+                        Month::Jan
+                    } else {
+                        reference.month()
+                    })
+                    .make(errs, loc, true)?;
                 let dend = if end.year.is_none() {
-                    end.default_year(dstart.year()).default_month(start.month.unwrap_or(if end.day.is_none() { Month::Dec } else { reference.month() }))
+                    end.default_year(dstart.year())
+                        .default_month(start.month.unwrap_or(if end.day.is_none() {
+                            Month::Dec
+                        } else {
+                            reference.month()
+                        }))
                 } else {
                     end
                 };
@@ -260,17 +293,21 @@ impl PartialPeriod {
                 } else {
                     Some(TimeFrame::Between(dstart, dend))
                 }
-            }        
+            }
         }
     }
 }
-            
 
-pub fn validate_partial_period(path: &str, errs: &mut error::Record, p: Pairs) -> Option<PartialPeriod> {
+pub fn validate_partial_period(
+    path: &str,
+    errs: &mut error::Record,
+    p: Pairs,
+) -> Option<PartialPeriod> {
     let inner = p.into_iter().next().unwrap();
     match inner.as_rule() {
         Rule::period_after => {
-            let trunc = validate_partial_date(path, errs, inner.into_inner().into_iter().next().unwrap())?;
+            let trunc =
+                validate_partial_date(path, errs, inner.into_inner().into_iter().next().unwrap())?;
             Some(PartialPeriod::After(trunc))
         }
         Rule::period_before => {
@@ -295,9 +332,7 @@ pub fn validate_partial_period(path: &str, errs: &mut error::Record, p: Pairs) -
             let end = validate_partial_date(path, errs, snd)?;
             Some(PartialPeriod::Between(start, end))
         }
-        Rule::period_empty => {
-            Some(PartialPeriod::Empty)
-        }
+        Rule::period_empty => Some(PartialPeriod::Empty),
         _ => unreachable!("{:?}", inner),
     }
 }
@@ -323,7 +358,12 @@ fn validate_partial_date(path: &str, errs: &mut error::Record, p: Pair) -> Optio
     }
 }
 
-fn validate_month_date(path: &str, errs: &mut error::Record, year: Option<u16>, p: Pair) -> Option<PartialDate> {
+fn validate_month_date(
+    path: &str,
+    errs: &mut error::Record,
+    year: Option<u16>,
+    p: Pair,
+) -> Option<PartialDate> {
     let mut inner = p.into_inner();
     let month = inner.next().unwrap();
     let loc = (path, month.as_span().clone());
@@ -347,7 +387,13 @@ fn validate_month_date(path: &str, errs: &mut error::Record, year: Option<u16>, 
     }
 }
 
-fn validate_day_date(path: &str, errs: &mut error::Record, year: Option<u16>, month: Option<Month>, p: Pair) -> Option<PartialDate> {
+fn validate_day_date(
+    path: &str,
+    errs: &mut error::Record,
+    year: Option<u16>,
+    month: Option<Month>,
+    p: Pair,
+) -> Option<PartialDate> {
     let day = p.as_str().parse::<u8>().unwrap();
     Some(PartialDate {
         year,
