@@ -211,10 +211,7 @@ pub fn instanciate<'i>(
                     Ok(contents) => contents,
                     Err(_) => {
                         errs.make("File not found")
-                            .span(
-                                &loc,
-                                "imported here",
-                            )
+                            .span(&loc, "imported here")
                             .text(format!("'{}' does not exist", filename))
                             .hint("check that the path is correct relative to the source file");
                         continue 'ast;

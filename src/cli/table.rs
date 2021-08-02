@@ -134,14 +134,14 @@ impl BoxFmt {
 impl ColFmt {
     fn with_label(label: BoxFmt) -> Self {
         Self {
-            width: label.width + 3,
+            width: label.width,
             label,
             boxes: Vec::new(),
         }
     }
 
     fn push(&mut self, b: BoxFmt) {
-        self.width = self.width.max(b.width + 3);
+        self.width = self.width.max(b.width);
         self.boxes.push(b);
     }
 }
@@ -231,7 +231,7 @@ impl ColFmt {
     }
 
     fn hline(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", &HLINE[..(self.width + 2) * 3])
+        write!(f, "{}", &HLINE[..(self.width + 2 + MARGIN) * 3])
     }
 }
 
@@ -247,6 +247,7 @@ const RTJOIN: &str = "├";
 const HIJOIN: &str = "┴";
 const LOJOIN: &str = "┬";
 const CROSS: &str = "┼";
+const MARGIN: usize = 1;
 impl BoxFmt {
     fn write(&self, f: &mut fmt::Formatter, width: usize, right: bool) -> fmt::Result {
         if let Some(c) = self.color {
@@ -256,7 +257,7 @@ impl BoxFmt {
             write!(
                 f,
                 " {}{} ",
-                &PADDING[..width.saturating_sub(self.width)],
+                &PADDING[..(width + MARGIN).saturating_sub(self.width)],
                 self.text,
             )?;
         } else {
@@ -264,7 +265,7 @@ impl BoxFmt {
                 f,
                 " {}{} ",
                 self.text,
-                &PADDING[..width.saturating_sub(self.width)],
+                &PADDING[..(width + MARGIN).saturating_sub(self.width)],
             )?;
         }
         write!(f, "{}", Color::BLANK)

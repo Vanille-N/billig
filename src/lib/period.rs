@@ -387,11 +387,7 @@ fn validate_month_date(
     }
 }
 
-fn validate_day_date(
-    year: Option<u16>,
-    month: Option<Month>,
-    p: Pair,
-) -> Option<PartialDate> {
+fn validate_day_date(year: Option<u16>, month: Option<Month>, p: Pair) -> Option<PartialDate> {
     let day = p.as_str().parse::<u8>().unwrap();
     Some(PartialDate {
         year,
