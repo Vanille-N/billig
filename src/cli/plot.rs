@@ -14,12 +14,9 @@ impl<'d> Plotter<'d> {
     }
 
     pub fn print_cumulative_plot(&self) {
-        println!(
-            "{:?}",
-            self.cumulative_plot()
-                .to_range_group_drawer()
-                .render("img.svg")
-        );
+        self.cumulative_plot()
+            .to_range_group_drawer()
+            .render("img.svg")
     }
 
     fn cumulative_plot(&self) -> Plot<Period, CumulativeEntry<Amount>> {

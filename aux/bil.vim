@@ -2,6 +2,7 @@
 " Language: Billig DSL
 " Maintainer: Neven Villani (Vanille-N)
 " Lastest Revision: 21 April 2021
+" License: MIT or Apache 2.0
 
 if exists("b:current_syntax")
     finish
