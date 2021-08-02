@@ -195,9 +195,7 @@ impl Entry {
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = format!("{}", self.value);
-        let padding = std::iter::repeat(' ')
-            .take(10_usize.saturating_sub(value.len()))
-            .collect::<String>();
+        let padding = " ".repeat(10_usize.saturating_sub(value.len()));
         write!(
             f,
             "{}..{}: \t{}{}\t ({:?}",

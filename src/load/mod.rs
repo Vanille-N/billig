@@ -10,7 +10,7 @@ pub fn read_entries(
     crate::lib::date::TimeFrame,
 ) {
     let mut errs = error::Record::new();
-    let contents = match std::fs::read_to_string(&filename) {
+    let contents = match std::fs::read_to_string(filename) {
         Ok(contents) => contents,
         Err(_) => {
             errs.make("File not found")
@@ -19,7 +19,7 @@ pub fn read_entries(
             return (None, errs, crate::lib::date::TimeFrame::Empty);
         }
     };
-    let data = parse::extract(&filename, &mut errs, &contents);
+    let data = parse::extract(filename, &mut errs, &contents);
     if errs.is_fatal() {
         return (None, errs, crate::lib::date::TimeFrame::Empty);
     }

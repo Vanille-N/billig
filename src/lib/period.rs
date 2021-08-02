@@ -43,7 +43,7 @@ impl TimeFrame {
         let (start, end) = match self {
             TimeFrame::Empty => {
                 errs.make("Period cannot be empty")
-                    .span(&loc, "provided here")
+                    .span(loc, "provided here")
                     .text("Explicit periods must have a beginning and/or an end")
                     .hint("use START.. or ..END or START..END")
                     .hint("for a single day simply use `span Day`");
@@ -51,7 +51,7 @@ impl TimeFrame {
             }
             TimeFrame::Unbounded => {
                 errs.make("Period cannot be unbounded")
-                    .span(&loc, "provided here")
+                    .span(loc, "provided here")
                     .text("Explicit periods must have a beginning and/or an end")
                     .hint("use START.. or ..END or START..END")
                     .hint("for a single day simply use `span Day`");
@@ -63,7 +63,7 @@ impl TimeFrame {
         };
         if start > end {
             errs.make("Period is accidentally empty")
-                .span(&loc, "provided here")
+                .span(loc, "provided here")
                 .text("This period has its END smaller than START")
                 .hint("empty periods are forbidden here");
             return None;
@@ -286,7 +286,7 @@ impl PartialPeriod {
                 let dend = dend.make(errs, loc, false)?;
                 if dstart > dend {
                     errs.make("End before start of timeframe")
-                        .span(&loc, "this timeframe")
+                        .span(loc, "this timeframe")
                         .text("Timeframe is empty")
                         .hint("If this is intentionnal consider using '()' instead");
                     None
