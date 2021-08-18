@@ -151,7 +151,12 @@ impl RangeGroupDrawer {
                     ymax = ymax.max(*pt);
                 }
             }
-            (xmin, ymin, xmax.saturating_sub(xmin), ymax.saturating_sub(ymin))
+            (
+                xmin,
+                ymin,
+                xmax.saturating_sub(xmin),
+                ymax.saturating_sub(ymin),
+            )
         };
         let fheight = 700.0;
         let fwidth = 1000.0;

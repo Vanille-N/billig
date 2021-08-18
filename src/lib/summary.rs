@@ -104,7 +104,7 @@ impl Calendar {
     pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
         Self::from_step(period.0, |date| {
             if period.1 <= date {
-                return None
+                return None;
             }
             let next = match duration {
                 Duration::Day => date.jump_day(count as isize),
@@ -133,7 +133,7 @@ impl Calendar {
 
     fn dichotomy_idx(&self, period: Period) -> Option<(usize, usize)> {
         if self.items.len() == 0 {
-            return None
+            return None;
         }
         let start = self.dichotomy_aux(period.0, 0, self.items.len());
         let end = self.dichotomy_aux(period.1, 0, self.items.len());
@@ -226,12 +226,12 @@ mod test {
         assert_eq!(idx, cal.items.len() - 1);
         // period
         let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2019-Jun-15)));
-        assert_eq!(ans.len(), 0);
+        assert!(ans.is_none());
         let ans = cal.dichotomy(Period(dt!(2021-Jun-10), dt!(2021-Jun-15)));
-        assert_eq!(ans.len(), 0);
+        assert!(ans.is_none());
         let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2021-Jun-15)));
-        assert_eq!(ans.len(), cal.items.len());
-        let ans = cal.dichotomy(Period(dt!(2020-Jan-20), dt!(2020-Mar-18)));
+        assert_eq!(ans.unwrap().len(), cal.items.len());
+        let ans = cal.dichotomy(Period(dt!(2020-Jan-20), dt!(2020-Mar-18))).unwrap();
         assert!(ans[0].period.0 <= dt!(2020-Jan-20));
         assert!(ans[0].period.1 >= dt!(2020-Jan-20));
         assert!(ans[ans.len() - 1].period.0 <= dt!(2020-Mar-18));

@@ -333,6 +333,7 @@ pub fn validate_partial_period(
             Some(PartialPeriod::Between(start, end))
         }
         Rule::period_empty => Some(PartialPeriod::Empty),
+        Rule::period => validate_partial_period(path, errs, inner.into_inner()),
         _ => unreachable!("{:?}", inner),
     }
 }
@@ -489,7 +490,7 @@ mod test {
     macro_rules! ps {
         ( $s:tt, $b:tt, $res:tt ) => {{
             let mut err = crate::load::error::Record::new();
-            match PartialPeriod::parse(&mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
+            match PartialPeriod::parse("raw", &mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
                 Some(period) => {
                     if !$b { panic!("{} instead of a failure\nHelp: this should be rejected", period.as_period()); }
                     assert_eq!(&format!("{}", period.as_period()), $res);
