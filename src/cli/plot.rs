@@ -151,7 +151,7 @@ impl RangeGroupDrawer {
                     ymax = ymax.max(*pt);
                 }
             }
-            (xmin, ymin, xmax - xmin, ymax - ymin)
+            (xmin, ymin, xmax.saturating_sub(xmin), ymax.saturating_sub(ymin))
         };
         let fheight = 700.0;
         let fwidth = 1000.0;
@@ -160,6 +160,9 @@ impl RangeGroupDrawer {
         let resize_x = |x| (x - xmin) as f64 / width as f64 * fwidth;
         let resize_y = |y| (height - (y - ymin)) as f64 / height as f64 * fheight;
         let mut groups = Vec::new();
+        if self.points.is_empty() {
+            return;
+        }
         let group_size = self.points[0].1.len();
         for i in 0..group_size - 1 {
             groups.push(

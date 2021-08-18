@@ -18,7 +18,7 @@ fn main() {
     if let Some(lst) = entries {
         timeframe = timeframe.intersect(TimeFrame::Between(
             Date::from(2020, Month::Sep, 1).unwrap(),
-            Date::from(2021, Month::Sep, 1).unwrap(),
+            Date::from(2022, Month::Jan, 1).unwrap(),
         ));
         println!("{:?}", timeframe);
         let mut cal_day = Calendar::from_spacing(timeframe.as_period(), Duration::Day, 1);

@@ -68,6 +68,7 @@ pub struct Calendar {
 
 impl Calendar {
     /// Construct from an _increasing_ iterator of dates
+    /// Periods[d1, d2, d3, ..., dn] -> Calendar[d1..d2, d2..d3, ..., dn-1..dn]
     pub fn from_iter<I>(mut splits: I) -> Self
     where
         I: Iterator<Item = Date>,
@@ -102,17 +103,16 @@ impl Calendar {
     /// Construct from a standardized span step generator
     pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
         Self::from_step(period.0, |date| {
+            if period.1 <= date {
+                return None
+            }
             let next = match duration {
                 Duration::Day => date.jump_day(count as isize),
                 Duration::Week => date.jump_day(count as isize * 7),
                 Duration::Month => date.jump_month(count as isize),
                 Duration::Year => date.jump_year(count as isize),
             };
-            if next <= period.1 {
-                Some(next)
-            } else {
-                None
-            }
+            Some(period.1.min(next))
         })
     }
 
@@ -131,35 +131,41 @@ impl Calendar {
         }
     }
 
-    fn dichotomy_idx(&self, period: Period) -> (usize, usize) {
+    fn dichotomy_idx(&self, period: Period) -> Option<(usize, usize)> {
+        if self.items.len() == 0 {
+            return None
+        }
         let start = self.dichotomy_aux(period.0, 0, self.items.len());
         let end = self.dichotomy_aux(period.1, 0, self.items.len());
         if start <= end
             && self.items[end].period.0 <= period.1
             && self.items[end].period.1 >= period.0
         {
-            (start, end)
+            Some((start, end))
         } else {
-            (1, 0)
+            None
         }
     }
 
-    fn dichotomy(&self, period: Period) -> &[Summary] {
-        let (start, end) = self.dichotomy_idx(period);
-        &self.items[start..=end]
+    fn dichotomy(&self, period: Period) -> Option<&[Summary]> {
+        let (start, end) = self.dichotomy_idx(period)?;
+        Some(&self.items[start..=end])
     }
 
-    fn dichotomy_mut(&mut self, period: Period) -> &mut [Summary] {
-        let (start, end) = self.dichotomy_idx(period);
-        &mut self.items[start..=end]
+    fn dichotomy_mut(&mut self, period: Period) -> Option<&mut [Summary]> {
+        let (start, end) = self.dichotomy_idx(period)?;
+        Some(&mut self.items[start..=end])
     }
 
     /// Add all entries to the summary
     pub fn register(&mut self, items: &[Entry]) {
         for item in items {
-            let range = self.dichotomy_mut(item.period());
-            for summary in range {
-                *summary += item;
+            if let Some(range) = self.dichotomy_mut(item.period()) {
+                for summary in range {
+                    *summary += item;
+                }
+            } else {
+                println!("Empty range for {}", item.period());
             }
         }
     }
