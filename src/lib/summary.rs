@@ -202,7 +202,11 @@ mod test {
 
     #[test]
     fn dichotomies() {
-        let cal = Calendar::from_spacing(Period(dt!(2020-Jan-1), dt!(2020-Dec-31)), Duration::Week, 1);
+        let cal = Calendar::from_spacing(
+            Period(dt!(2020-Jan-1), dt!(2020-Dec-31)),
+            Duration::Week,
+            1
+        );
         println!("{:?}", cal);
         // middle
         let (date, _, start) = query!(cal, dt!(2020-Feb-5));

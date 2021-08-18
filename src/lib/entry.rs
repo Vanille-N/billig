@@ -49,7 +49,7 @@ pub struct Entry {
 }
 
 /// Kinds of expenses
-#[derive(Debug, Clone, Copy, FromPrimitive)]
+#[derive(Debug, Clone, Copy, FromPrimitive, Eq, PartialEq, Hash)]
 pub enum Category {
     Salary,
     Home,
@@ -70,7 +70,7 @@ pub struct Span {
 }
 
 /// Granularity of `Span` length
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum Duration {
     Day,
     Week,
@@ -78,8 +78,19 @@ pub enum Duration {
     Year,
 }
 
+impl Duration {
+    pub fn text_frequency(self) -> &'static str {
+        match self {
+            Duration::Day => "Daily",
+            Duration::Week => "Weekly",
+            Duration::Month => "Monthly",
+            Duration::Year => "Yearly",
+        }
+    }
+}
+
 /// Position of `Span` relative to reference date
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Window {
     Current,
     Posterior,

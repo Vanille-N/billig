@@ -7,12 +7,39 @@ use lib::{
     date::{Date, Duration, Month, TimeFrame},
     summary::Calendar,
 };
+use std::collections::{BTreeSet, HashMap};
+
+use clap::{App, Arg};
 
 fn main() {
-    let filename = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "expenses.bil".to_string());
-
+    let matches = App::new("Billig")
+        .version("0.2")
+        .author("Vanille N. <neven.villani@gmail.com>")
+        .about("Command-line DSL-powered budget manager")
+        .arg(
+            Arg::with_name("source")
+                .default_value("expenses.bil")
+                .value_name("FILE")
+                .help("Source file"),
+        )
+        .arg(
+            Arg::with_name("table")
+                .short("t")
+                .long("table")
+                .value_name("TABLE,...")
+                .help("Choose tables to print (day, week, month, year)")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("plot")
+                .short("p")
+                .long("plot")
+                .value_name("PLOT,...")
+                .help("Choose plots to print (day, week, month, year)")
+                .takes_value(true),
+        )
+        .get_matches();
+    let filename = matches.value_of("source").unwrap();
     let (entries, errs, mut timeframe) = load::read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
@@ -20,21 +47,44 @@ fn main() {
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2022, Month::Jan, 1).unwrap(),
         ));
-        println!("{:?}", timeframe);
-        let mut cal_day = Calendar::from_spacing(timeframe.as_period(), Duration::Day, 1);
-        let mut cal_week = Calendar::from_spacing(timeframe.as_period(), Duration::Week, 1);
-        let mut cal_month = Calendar::from_spacing(timeframe.as_period(), Duration::Month, 1);
-        let mut cal_year = Calendar::from_spacing(timeframe.as_period(), Duration::Year, 1);
-        cal_day.register(&lst);
-        cal_week.register(&lst);
-        cal_month.register(&lst);
-        cal_year.register(&lst);
-        let table_week = Table::from(cal_week.contents()).with_title("Weekly");
-        let table_month = Table::from(cal_month.contents()).with_title("Monthly");
-        let table_year = Table::from(cal_year.contents()).with_title("Yearly");
-        println!("{}", table_week);
-        println!("{}", table_month);
-        println!("{}", table_year);
-        Plotter::from(cal_day.contents()).print_cumulative_plot();
+        let tables = durations(&matches, "table");
+        let plots = durations(&matches, "plot");
+        dbg!(&tables, &plots);
+        let mut calendars: HashMap<Duration, Calendar> = tables
+            .union(&plots)
+            .map(|&k| (k, Calendar::from_spacing(timeframe.as_period(), k, 1)))
+            .collect();
+        for (_, cal) in calendars.iter_mut() {
+            cal.register(&lst);
+        }
+        for t in tables {
+            let tbl = Table::from(calendars[&t].contents()).with_title(t.text_frequency());
+            println!("{}", tbl);
+        }
+        for p in plots {
+            Plotter::from(calendars[&p].contents()).print_cumulative_plot(p.text_frequency());
+        }
+    }
+}
+
+fn durations(matches: &clap::ArgMatches, label: &str) -> BTreeSet<Duration> {
+    if let Some(s) = matches.value_of(label) {
+        s.split(',')
+            .filter_map(|v| {
+                Some(match v {
+                    "day" | "d" => Duration::Day,
+                    "week" | "w" => Duration::Week,
+                    "month" | "m" => Duration::Month,
+                    "year" | "y" => Duration::Year,
+                    other => {
+                        eprintln!("'{}' is not a valid duration", other);
+                        eprintln!("Expected one of 'day','week','month','year' or 'd','w','m','y'");
+                        return None;
+                    }
+                })
+            })
+            .collect()
+    } else {
+        BTreeSet::new()
     }
 }
