@@ -12,19 +12,34 @@ for the day they occur cannot provide accurate insights due to high variability.
 Billig aims to remove this limitation by having all transactions be registered
 with the timeframe during which they are relevant.
 
-Billig is a rewrite from Python to Rust of another project of mine; when feature
-parity is reached it will provide graphical representations and tabulated summaries.
-The original project used Python dictionaries to store data, Billig aims to offer
-a better experience by using a specifically-designed DSL.
+Billig is a rewrite from Python to Rust of another project of mine; feature parity
+has been reached since Billig now provides graphical representations and tabulated
+summaries. The original project used Python dictionaries to store data, Billig aims
+to offer a better experience by using a specifically-designed DSL.
 
 
 # Usage
 
-*WIP: Billig does not yet have a command-line interface*
+*WIP: Billig's command-line interface is subject to change*
 
-For now, when executed it either read the first argument or look for `expenses.bil`
-in the current folder, and output weekly, monthly and yearly tables, as well as
-export an SVG graph.
+Run `billig -h` for help.
+
+```
+Complete form:
+$ billig --plot day,week --table week,month,year expenses.bil
+         ^               ^                       ^--- source file
+         |               |
+         |               '--- which tables to show: weekly + monthly + yearly
+         '--- which plots to show : daily + weekly
+
+Shortened:
+$ billig -pd,w -tw,m,y
+         ^     ^         ^--- default source is expenses.bil
+         |     |
+         |     '--- -t short for --table, m for month, y for year
+         '--- -p short for --plot, d for day, w for week
+```
+Tables are printed in the terminal in color, plots are generated as `.svg`
 
 
 
