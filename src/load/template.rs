@@ -187,7 +187,7 @@ pub fn instanciate<'i>(
     'ast: for item in items {
         match item {
             Item::Entry(entry) => {
-                timeframe = timeframe.unite(entry.period().as_interval());
+                timeframe = timeframe.unite(entry.period().into_interval());
                 entries.push(entry);
             }
             Item::Template(name, body) => {
@@ -196,7 +196,7 @@ pub fn instanciate<'i>(
             Item::Instance(date, instance) => {
                 match instanciate_item(errs, instance, date, &templates) {
                     Some(inst) => {
-                        timeframe = timeframe.unite(inst.period().as_interval());
+                        timeframe = timeframe.unite(inst.period().into_interval());
                         entries.push(inst);
                     }
                     None => continue 'ast,

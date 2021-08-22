@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 use std::fmt;
 
 use crate::lib::{
-    date::{Date, Between},
+    date::{Between, Date},
     entry::{Amount, Category},
     summary::Summary,
 };

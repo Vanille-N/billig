@@ -3,17 +3,11 @@ pub mod parse;
 pub mod template;
 
 use crate::lib::{
-    entry::Entry,
     date::{Date, Interval},
+    entry::Entry,
 };
 
-pub fn read_entries(
-    filename: &str,
-) -> (
-    Option<Vec<Entry>>,
-    error::Record,
-    Interval<Date>,
-) {
+pub fn read_entries(filename: &str) -> (Option<Vec<Entry>>, error::Record, Interval<Date>) {
     let mut errs = error::Record::new();
     let contents = match std::fs::read_to_string(filename) {
         Ok(contents) => contents,

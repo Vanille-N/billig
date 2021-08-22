@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use num_derive::FromPrimitive;
 
-use crate::lib::date::{Date, Between};
+use crate::lib::date::{Between, Date};
 
 /// Contents of entries
 pub mod fields {
@@ -30,6 +30,11 @@ impl fmt::Display for Amount {
             (self.0 % 100).abs()
         )
     }
+}
+
+impl crate::lib::period::Minimax for Amount {
+    const MIN: Self = Self(isize::MIN);
+    const MAX: Self = Self(isize::MAX);
 }
 
 impl fmt::Display for Tag {

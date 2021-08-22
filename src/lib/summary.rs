@@ -1,7 +1,7 @@
 use std::ops;
 
 use crate::lib::{
-    date::{Date, Between},
+    date::{Between, Date},
     entry::{Amount, Category, Duration, Entry},
 };
 
@@ -132,7 +132,7 @@ impl Calendar {
     }
 
     fn dichotomy_idx(&self, period: Between<Date>) -> Option<(usize, usize)> {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return None;
         }
         let start = self.dichotomy_aux(period.0, 0, self.items.len());

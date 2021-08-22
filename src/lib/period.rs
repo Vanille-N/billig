@@ -9,6 +9,11 @@ pub trait Minimax: Ord {
     const MAX: Self;
 }
 
+impl Minimax for i64 {
+    const MIN: i64 = Self::MIN;
+    const MAX: i64 = Self::MAX;
+}
+
 /// `Period(a, b)` is the range of dates from `a` to `b` inclusive
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Between<T>(pub T, pub T);
@@ -23,8 +28,10 @@ pub enum Interval<T> {
 }
 
 impl<T> Interval<T>
-where T: Minimax {
-    pub fn as_between(self) -> Between<T> {
+where
+    T: Minimax,
+{
+    pub fn into_between(self) -> Between<T> {
         let (start, end) = match self {
             Interval::Between(start, end) => (start, end),
             Interval::After(start) => (start, T::MAX),
@@ -71,8 +78,10 @@ impl Interval<Date> {
 }
 
 impl<T> Between<T>
-where T: Minimax {
-    pub fn as_interval(self) -> Interval<T> {
+where
+    T: Minimax,
+{
+    pub fn into_interval(self) -> Interval<T> {
         if self.0 > self.1 {
             Interval::Empty
         } else if self.0 == T::MIN {
@@ -86,6 +95,19 @@ where T: Minimax {
         } else {
             Interval::Between(self.0, self.1)
         }
+    }
+}
+
+impl<T> Between<T>
+where
+    T: Ord,
+{
+    pub fn unite(self, other: Self) -> Self {
+        Self(self.0.min(other.0), self.1.max(other.1))
+    }
+
+    pub fn intersect(self, other: Self) -> Self {
+        Self(self.0.max(other.0), self.1.min(other.1))
     }
 }
 
@@ -171,7 +193,9 @@ type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
 impl<T> Interval<T>
-where T: Ord {
+where
+    T: Ord,
+{
     pub fn normalized(self) -> Self {
         if let Interval::Between(start, end) = &self {
             if start > end {
@@ -241,7 +265,12 @@ impl Interval<PartialDate> {
         }
     }
 
-    pub fn make(self, errs: &mut error::Record, loc: &Loc, reference: Date) -> Option<Interval<Date>> {
+    pub fn make(
+        self,
+        errs: &mut error::Record,
+        loc: &Loc,
+        reference: Date,
+    ) -> Option<Interval<Date>> {
         match self {
             Interval::Empty => Some(Interval::Empty),
             Interval::Unbounded => Some(Interval::Unbounded),
@@ -491,8 +520,8 @@ mod test {
             let mut err = crate::load::error::Record::new();
             match Interval::parse("raw", &mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
                 Some(period) => {
-                    if !$b { panic!("{} instead of a failure\nHelp: this should be rejected", period.as_period()); }
-                    assert_eq!(&format!("{}", period.as_period()), $res);
+                    if !$b { panic!("{} instead of a failure\nHelp: this should be rejected", period.into_period()); }
+                    assert_eq!(&format!("{}", period.into_period()), $res);
                 }
                 None => {
                     if $b { panic!("{} instead of a success\nHelp: this should be accepted", err); }

@@ -1,6 +1,7 @@
 use crate::lib::{
-    date::{Date, Between},
+    date::Date,
     entry::Amount,
+    period::{Between, Minimax},
     summary::Summary,
 };
 
@@ -37,6 +38,50 @@ impl<'d> Plotter<'d> {
         }
         plot
     }
+}
+
+pub struct Grads<T> {
+    lower: T,
+    upper: T,
+}
+
+impl<T> Grads<T>
+where
+    T: Minimax,
+{
+    fn new() -> Self {
+        Self {
+            lower: T::MAX,
+            upper: T::MIN,
+        }
+    }
+}
+
+impl<T> Grads<T>
+where
+    T: Ord + Copy,
+{
+    fn extend(&mut self, data: T) {
+        self.lower = self.lower.min(data);
+        self.upper = self.upper.max(data);
+    }
+}
+
+impl<T> Grads<T>
+where
+    T: ToString + Scalar,
+{
+    fn split(self) -> Vec<(i64, String)> {
+        vec![
+            (self.lower.to_scalar(), self.lower.to_string()),
+            (self.upper.to_scalar(), self.lower.to_string()),
+        ]
+    }
+}
+
+pub trait GradExtend {
+    type Item;
+    fn extend(&self, grads: &mut Grads<Self::Item>);
 }
 
 /// Generic plotter
@@ -109,9 +154,22 @@ impl Scalar for Date {
 }
 
 impl<T> ScalarRange for Between<T>
-where T: Scalar {
+where
+    T: Scalar,
+{
     fn to_range(&self) -> (i64, i64) {
         (self.0.to_scalar(), self.1.to_scalar())
+    }
+}
+
+impl<T> GradExtend for Between<T>
+where
+    T: Ord + Copy,
+{
+    type Item = T;
+    fn extend(&self, grad: &mut Grads<Self::Item>) {
+        grad.extend(self.0);
+        grad.extend(self.1);
     }
 }
 
@@ -121,6 +179,17 @@ where
 {
     fn to_range(&self) -> (i64, i64) {
         (self.0.to_scalar(), self.1.to_scalar())
+    }
+}
+
+impl<T> GradExtend for (T, T)
+where
+    T: Ord + Copy,
+{
+    type Item = T;
+    fn extend(&self, grad: &mut Grads<Self::Item>) {
+        grad.extend(self.0);
+        grad.extend(self.1);
     }
 }
 
@@ -136,18 +205,40 @@ where
     }
 }
 
+impl<Y> GradExtend for CumulativeEntry<Y>
+where
+    Y: Ord + Copy,
+{
+    type Item = Y;
+    fn extend(&self, grad: &mut Grads<Self::Item>) {
+        for item in &self.points {
+            grad.extend(*item);
+        }
+    }
+}
+
 impl<X, Y> Plot<X, Y>
 where
-    X: ScalarRange,
-    Y: ScalarGroup,
+    X: ScalarRange + GradExtend,
+    Y: ScalarGroup + GradExtend,
+    <X as GradExtend>::Item: ToString + Scalar + Minimax,
+    <Y as GradExtend>::Item: ToString + Scalar + Minimax,
 {
     fn to_range_group_drawer(&self) -> RangeGroupDrawer {
+        let mut points = Vec::new();
+        let mut grad_x = Grads::new();
+        let mut grad_y = Grads::new();
+        for (x, y) in &self.data {
+            x.extend(&mut grad_x);
+            y.extend(&mut grad_y);
+            let x = x.to_range();
+            let y = y.to_group();
+            points.push((x, y));
+        }
         RangeGroupDrawer {
-            points: self
-                .data
-                .iter()
-                .map(|(x, y)| (x.to_range(), y.to_group()))
-                .collect::<Vec<_>>(),
+            points,
+            grad_x: grad_x.split(),
+            grad_y: grad_y.split(),
         }
     }
 }
@@ -222,6 +313,8 @@ impl Dimensions {
 #[derive(Debug)]
 struct RangeGroupDrawer {
     points: Vec<((i64, i64), Vec<i64>)>,
+    grad_x: Vec<(i64, String)>,
+    grad_y: Vec<(i64, String)>,
 }
 
 use svg::{
@@ -232,34 +325,6 @@ use svg::{
 impl RangeGroupDrawer {
     fn render(&self, file: &str) {
         // configure dimensions with extremal values
-        let (xmin, ymin, width, height) = {
-            let mut xmin = i64::MAX;
-            let mut ymin = i64::MAX;
-            let mut xmax = i64::MIN;
-            let mut ymax = i64::MIN;
-            for ((start, end), points) in &self.points {
-                xmin = xmin.min(*start).min(*end);
-                xmax = xmax.max(*start).max(*end);
-                for pt in points {
-                    ymin = ymin.min(*pt);
-                    ymax = ymax.max(*pt);
-                }
-            }
-            (
-                xmin,
-                ymin,
-                xmax.saturating_sub(xmin),
-                ymax.saturating_sub(ymin),
-            )
-        };
-        // dimensions
-        let fheight = 700.0;
-        let fwidth = 1000.0;
-        let stroke_width = 2.0;
-        let margin = 20.0;
-        let resize_x = |x: i64| (x - xmin) as f64 / width as f64 * fwidth;
-        let resize_y = |y: i64| (height - (y - ymin)) as f64 / height as f64 * fheight;
-        let atomic_width = 0.95 / width as f64 * fwidth;
         let dim = Dimensions::new().with_data(
             self.points
                 .iter()
@@ -325,9 +390,18 @@ impl RangeGroupDrawer {
             .set("x1", dim.resize_x(dim.min_x))
             .set("x2", dim.resize_x(dim.min_x))
             .set("y1", dim.resize_y(dim.max_y) - dim.margin / 2.0)
-            .set("y2", dim.resize_y(dim.min_y))
+            .set("y2", dim.resize_y(dim.min_y) + dim.margin / 2.0)
             .set("stroke", "black")
             .set("stroke-width", dim.stroke_width);
+        let ygrad = self.grad_y.iter().map(|(n, txt)| {
+            Line::new()
+                .set("x1", dim.resize_x(dim.min_x))
+                .set("x2", dim.resize_x(dim.min_x) - dim.margin / 2.0)
+                .set("y1", dim.resize_y(*n))
+                .set("y2", dim.resize_y(*n))
+                .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width)
+        });
         let xaxis = Line::new()
             .set("x1", dim.resize_x(dim.min_x))
             .set("x2", dim.resize_x(dim.max_x) + dim.margin / 2.0)
@@ -335,9 +409,22 @@ impl RangeGroupDrawer {
             .set("y2", dim.resize_y(0))
             .set("stroke", "black")
             .set("stroke-width", dim.stroke_width);
+        let xgrad = self.grad_x.iter().map(|(n, txt)| {
+            Line::new()
+                .set("x1", dim.resize_x(*n))
+                .set("x2", dim.resize_x(*n))
+                .set("y1", dim.resize_y(0))
+                .set("y2", dim.resize_y(0) + dim.margin / 2.0)
+                .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width)
+        });
         let document = paths
             .into_iter()
-            .fold(Document::new(), |doc, path| doc.add(path))
+            .fold(Document::new(), |doc, path| doc.add(path));
+        let document = ygrad
+            .into_iter()
+            .chain(xgrad.into_iter())
+            .fold(document, |doc, path| doc.add(path))
             .add(yaxis)
             .add(xaxis)
             .set(
