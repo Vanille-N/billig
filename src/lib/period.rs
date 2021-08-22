@@ -4,44 +4,42 @@ use std::fmt;
 
 use crate::lib::date::{Date, Month};
 
+pub trait Minimax: Ord {
+    const MIN: Self;
+    const MAX: Self;
+}
+
 /// `Period(a, b)` is the range of dates from `a` to `b` inclusive
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Period(pub Date, pub Date);
+pub struct Between<T>(pub T, pub T);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TimeFrame {
-    Between(Date, Date),
-    After(Date),
-    Before(Date),
+pub enum Interval<T> {
+    Between(T, T),
+    After(T),
+    Before(T),
     Empty,
     Unbounded,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PartialPeriod {
-    Between(PartialDate, PartialDate),
-    After(PartialDate),
-    Before(PartialDate),
-    Empty,
-    Unbounded,
-}
-
-impl TimeFrame {
-    pub fn as_period(self) -> Period {
-        use TimeFrame::*;
+impl<T> Interval<T>
+where T: Minimax {
+    pub fn as_between(self) -> Between<T> {
         let (start, end) = match self {
-            Between(start, end) => (start, end),
-            After(start) => (start, Date::MAX),
-            Before(end) => (Date::MIN, end),
-            Empty => (Date::MAX, Date::MIN),
-            Unbounded => (Date::MIN, Date::MAX),
+            Interval::Between(start, end) => (start, end),
+            Interval::After(start) => (start, T::MAX),
+            Interval::Before(end) => (T::MAX, end),
+            Interval::Empty => (T::MAX, T::MIN),
+            Interval::Unbounded => (T::MIN, T::MAX),
         };
-        Period(start, end)
+        Between(start, end)
     }
+}
 
-    pub fn bounded(self, errs: &mut error::Record, loc: &Loc, date: Date) -> Option<Period> {
+impl Interval<Date> {
+    pub fn bounded(self, errs: &mut error::Record, loc: &Loc, date: Date) -> Option<Between<Date>> {
         let (start, end) = match self {
-            TimeFrame::Empty => {
+            Interval::Empty => {
                 errs.make("Period cannot be empty")
                     .span(loc, "provided here")
                     .text("Explicit periods must have a beginning and/or an end")
@@ -49,7 +47,7 @@ impl TimeFrame {
                     .hint("for a single day simply use `span Day`");
                 return None;
             }
-            TimeFrame::Unbounded => {
+            Interval::Unbounded => {
                 errs.make("Period cannot be unbounded")
                     .span(loc, "provided here")
                     .text("Explicit periods must have a beginning and/or an end")
@@ -57,9 +55,9 @@ impl TimeFrame {
                     .hint("for a single day simply use `span Day`");
                 return None;
             }
-            TimeFrame::Between(start, end) => (start, end),
-            TimeFrame::After(start) => (start, date),
-            TimeFrame::Before(end) => (date, end),
+            Interval::Between(start, end) => (start, end),
+            Interval::After(start) => (start, date),
+            Interval::Before(end) => (date, end),
         };
         if start > end {
             errs.make("Period is accidentally empty")
@@ -68,30 +66,30 @@ impl TimeFrame {
                 .hint("empty periods are forbidden here");
             return None;
         }
-        Some(Period(start, end))
+        Some(Between(start, end))
     }
 }
 
-impl Period {
-    pub fn as_timeframe(self) -> TimeFrame {
-        use TimeFrame::*;
+impl<T> Between<T>
+where T: Minimax {
+    pub fn as_interval(self) -> Interval<T> {
         if self.0 > self.1 {
-            Empty
-        } else if self.0 == Date::MIN {
-            if self.1 == Date::MAX {
-                Unbounded
+            Interval::Empty
+        } else if self.0 == T::MIN {
+            if self.1 == T::MAX {
+                Interval::Unbounded
             } else {
-                Before(self.1)
+                Interval::Before(self.1)
             }
-        } else if self.1 == Date::MAX {
-            After(self.0)
+        } else if self.1 == T::MAX {
+            Interval::After(self.0)
         } else {
-            Between(self.0, self.1)
+            Interval::Between(self.0, self.1)
         }
     }
 }
 
-impl fmt::Display for Period {
+impl fmt::Display for Between<Date> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let merge_day = |f: &mut fmt::Formatter| {
             if self.0.day() == 1 && self.1.day() == self.1.month().count(self.1.year()) {
@@ -172,18 +170,19 @@ use crate::load::parse::Rule;
 type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
-impl TimeFrame {
+impl<T> Interval<T>
+where T: Ord {
     pub fn normalized(self) -> Self {
-        if let TimeFrame::Between(start, end) = self {
+        if let Interval::Between(start, end) = &self {
             if start > end {
-                return TimeFrame::Empty;
+                return Interval::Empty;
             }
         }
         self
     }
 
     pub fn intersect(self, other: Self) -> Self {
-        use TimeFrame::*;
+        use Interval::*;
         match (self, other) {
             (_, Empty) | (Empty, _) => Empty,
             (lhs, Unbounded) => lhs,
@@ -204,7 +203,7 @@ impl TimeFrame {
     }
 
     pub fn unite(self, other: Self) -> Self {
-        use TimeFrame::*;
+        use Interval::*;
         match (self, other) {
             (_, Unbounded) | (Unbounded, _) => Unbounded,
             (lhs, Empty) => lhs,
@@ -225,8 +224,8 @@ impl TimeFrame {
     }
 }
 
-impl PartialPeriod {
-    pub fn parse(path: &str, errs: &mut error::Record, s: &str) -> Option<PartialPeriod> {
+impl Interval<PartialDate> {
+    pub fn parse(path: &str, errs: &mut error::Record, s: &str) -> Option<Interval<PartialDate>> {
         let contents = match crate::load::parse::BilligParser::parse(Rule::period_only, s) {
             Ok(contents) => contents,
             Err(e) => {
@@ -242,11 +241,11 @@ impl PartialPeriod {
         }
     }
 
-    pub fn make(self, errs: &mut error::Record, loc: &Loc, reference: Date) -> Option<TimeFrame> {
+    pub fn make(self, errs: &mut error::Record, loc: &Loc, reference: Date) -> Option<Interval<Date>> {
         match self {
-            PartialPeriod::Empty => Some(TimeFrame::Empty),
-            PartialPeriod::Unbounded => Some(TimeFrame::Unbounded),
-            PartialPeriod::After(pdt) => Some(TimeFrame::After(
+            Interval::Empty => Some(Interval::Empty),
+            Interval::Unbounded => Some(Interval::Unbounded),
+            Interval::After(pdt) => Some(Interval::After(
                 pdt.default_year(reference.year())
                     .default_month(if pdt.day.is_none() {
                         Month::Jan
@@ -255,7 +254,7 @@ impl PartialPeriod {
                     })
                     .make(errs, loc, true)?,
             )),
-            PartialPeriod::Before(pdt) => Some(TimeFrame::Before(
+            Interval::Before(pdt) => Some(Interval::Before(
                 pdt.default_year(reference.year())
                     .default_month(if pdt.day.is_none() {
                         Month::Dec
@@ -264,7 +263,7 @@ impl PartialPeriod {
                     })
                     .make(errs, loc, false)?,
             )),
-            PartialPeriod::Between(start, end) => {
+            Interval::Between(start, end) => {
                 let dstart = start
                     .default_year(reference.year())
                     .default_month(if start.day.is_none() {
@@ -291,7 +290,7 @@ impl PartialPeriod {
                         .hint("If this is intentionnal consider using '()' instead");
                     None
                 } else {
-                    Some(TimeFrame::Between(dstart, dend))
+                    Some(Interval::Between(dstart, dend))
                 }
             }
         }
@@ -302,27 +301,27 @@ pub fn validate_partial_period(
     path: &str,
     errs: &mut error::Record,
     p: Pairs,
-) -> Option<PartialPeriod> {
+) -> Option<Interval<PartialDate>> {
     let inner = p.into_iter().next().unwrap();
     match inner.as_rule() {
         Rule::period_after => {
             let trunc =
                 validate_partial_date(path, errs, inner.into_inner().into_iter().next().unwrap())?;
-            Some(PartialPeriod::After(trunc))
+            Some(Interval::After(trunc))
         }
         Rule::period_before => {
             let end = inner.into_inner().into_iter().next();
             match end {
                 Some(end) => {
                     let trunc = validate_partial_date(path, errs, end)?;
-                    Some(PartialPeriod::Before(trunc))
+                    Some(Interval::Before(trunc))
                 }
-                None => Some(PartialPeriod::Unbounded),
+                None => Some(Interval::Unbounded),
             }
         }
         Rule::partial_date | Rule::full_date | Rule::marker_day | Rule::month_date => {
             let trunc = validate_partial_date(path, errs, inner)?;
-            Some(PartialPeriod::Between(trunc, trunc))
+            Some(Interval::Between(trunc, trunc))
         }
         Rule::period_between => {
             let mut inner = inner.into_inner();
@@ -330,9 +329,9 @@ pub fn validate_partial_period(
             let start = validate_partial_date(path, errs, fst)?;
             let snd = inner.next().unwrap();
             let end = validate_partial_date(path, errs, snd)?;
-            Some(PartialPeriod::Between(start, end))
+            Some(Interval::Between(start, end))
         }
-        Rule::period_empty => Some(PartialPeriod::Empty),
+        Rule::period_empty => Some(Interval::Empty),
         Rule::period => validate_partial_period(path, errs, inner.into_inner()),
         _ => unreachable!("{:?}", inner),
     }
@@ -464,7 +463,7 @@ mod test {
 
     macro_rules! pp {
         ( $start:expr, $end:expr => $fmt:expr ) => {{
-            assert_eq!(&format!("{}", Period($start, $end)), $fmt);
+            assert_eq!(&format!("{}", Between($start, $end)), $fmt);
         }}
     }
 
@@ -490,7 +489,7 @@ mod test {
     macro_rules! ps {
         ( $s:tt, $b:tt, $res:tt ) => {{
             let mut err = crate::load::error::Record::new();
-            match PartialPeriod::parse("raw", &mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
+            match Interval::parse("raw", &mut err, $s).map(|pp| pp.make(&mut err, &("", pest::Span::new("", 0, 0).unwrap()), dt!(2021-Feb-1))).flatten() {
                 Some(period) => {
                     if !$b { panic!("{} instead of a failure\nHelp: this should be rejected", period.as_period()); }
                     assert_eq!(&format!("{}", period.as_period()), $res);

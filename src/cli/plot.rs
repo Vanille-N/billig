@@ -1,5 +1,5 @@
 use crate::lib::{
-    date::{Date, Period},
+    date::{Date, Between},
     entry::Amount,
     summary::Summary,
 };
@@ -30,7 +30,7 @@ impl<'d> Plotter<'d> {
     }
 
     /// Accumulate contained data into cumulative plot
-    fn cumulative_plot(&self) -> Plot<Period, CumulativeEntry<Amount>> {
+    fn cumulative_plot(&self) -> Plot<Between<Date>, CumulativeEntry<Amount>> {
         let mut plot = Plot::new();
         for sum in self.data {
             plot.push(sum.period(), CumulativeEntry::cumul(sum.amounts().to_vec()));
@@ -108,7 +108,8 @@ impl Scalar for Date {
     }
 }
 
-impl ScalarRange for Period {
+impl<T> ScalarRange for Between<T>
+where T: Scalar {
     fn to_range(&self) -> (i64, i64) {
         (self.0.to_scalar(), self.1.to_scalar())
     }

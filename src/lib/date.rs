@@ -14,7 +14,7 @@ use std::str::FromStr;
 
 pub use crate::lib::{
     entry::Duration,
-    period::{Period, TimeFrame},
+    period::{Between, Interval},
 };
 
 /// A date with day-precision
@@ -152,19 +152,21 @@ pub enum DateError {
     InvalidDay(usize),
 }
 
-impl Date {
-    pub const MAX: Self = Self {
+impl crate::lib::period::Minimax for Date {
+    const MAX: Self = Self {
         year: 9999,
         month: Month::Dec,
         day: 31,
     };
 
-    pub const MIN: Self = Self {
+    const MIN: Self = Self {
         year: 1000,
         month: Month::Jan,
         day: 1,
     };
+}
 
+impl Date {
     /// Validate year-month-day into date
     pub fn from(year: usize, month: Month, day: usize) -> Result<Self, DateError> {
         if !(1000..=9999).contains(&year) {

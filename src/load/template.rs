@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::lib::{
-    date::{self, Date, TimeFrame},
+    date::{self, Date, Interval},
     entry::{
         fields::{self, Category, Span},
         Entry,
@@ -180,14 +180,14 @@ pub fn instanciate<'i>(
     errs: &mut error::Record,
     items: ast::Ast<'i>,
     mut templates: HashMap<String, crate::load::template::Template<'i>>,
-) -> (Vec<Entry>, TimeFrame) {
+) -> (Vec<Entry>, Interval<Date>) {
     let mut entries = Vec::new();
-    let mut timeframe = date::TimeFrame::Empty;
+    let mut timeframe = date::Interval::Empty;
     use ast::*;
     'ast: for item in items {
         match item {
             Item::Entry(entry) => {
-                timeframe = timeframe.unite(entry.period().as_timeframe());
+                timeframe = timeframe.unite(entry.period().as_interval());
                 entries.push(entry);
             }
             Item::Template(name, body) => {
@@ -196,7 +196,7 @@ pub fn instanciate<'i>(
             Item::Instance(date, instance) => {
                 match instanciate_item(errs, instance, date, &templates) {
                     Some(inst) => {
-                        timeframe = timeframe.unite(inst.period().as_timeframe());
+                        timeframe = timeframe.unite(inst.period().as_interval());
                         entries.push(inst);
                     }
                     None => continue 'ast,
@@ -219,7 +219,7 @@ pub fn instanciate<'i>(
                 };
                 let data = crate::load::parse::extract(filename, errs, &contents);
                 if errs.is_fatal() {
-                    return (Vec::new(), crate::lib::date::TimeFrame::Empty);
+                    return (Vec::new(), crate::lib::date::Interval::Empty);
                 }
                 let (pairs, period) =
                     crate::load::template::instanciate(filename, errs, data, templates.clone());

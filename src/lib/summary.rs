@@ -1,14 +1,14 @@
 use std::ops;
 
 use crate::lib::{
-    date::{Date, Period},
+    date::{Date, Between},
     entry::{Amount, Category, Duration, Entry},
 };
 
 #[derive(Debug, Clone)]
 pub struct Summary {
     /// Period of relevance added entries are to be intersected with
-    period: Period,
+    period: Between<Date>,
     /// Cached total
     total: Amount,
     /// Subtotals per expense kind
@@ -17,7 +17,7 @@ pub struct Summary {
 
 impl Summary {
     /// Initialize blank
-    pub fn from_period(period: Period) -> Self {
+    pub fn from_period(period: Between<Date>) -> Self {
         Self {
             period,
             total: Amount(0),
@@ -27,7 +27,7 @@ impl Summary {
 
     /// Initialize blank for a single day
     pub fn from_date(date: Date) -> Self {
-        Self::from_period(Period(date, date))
+        Self::from_period(Between(date, date))
     }
 
     /// Read subtotal for an expense kind
@@ -40,7 +40,7 @@ impl Summary {
         &self.categories[..]
     }
 
-    pub fn period(&self) -> Period {
+    pub fn period(&self) -> Between<Date> {
         self.period
     }
 
@@ -79,7 +79,7 @@ impl Calendar {
             let end = splits.next();
             if let Some(b) = end {
                 assert!(start < end);
-                items.push(Summary::from_period(Period(a, b.prev())));
+                items.push(Summary::from_period(Between(a, b.prev())));
             }
             start = end;
         }
@@ -94,14 +94,14 @@ impl Calendar {
         let mut items = Vec::new();
         while let Some(end) = step(start) {
             assert!(start < end);
-            items.push(Summary::from_period(Period(start, end.prev())));
+            items.push(Summary::from_period(Between(start, end.prev())));
             start = end;
         }
         Self { items }
     }
 
     /// Construct from a standardized span step generator
-    pub fn from_spacing(period: Period, duration: Duration, count: usize) -> Self {
+    pub fn from_spacing(period: Between<Date>, duration: Duration, count: usize) -> Self {
         Self::from_step(period.0, |date| {
             if period.1 <= date {
                 return None;
@@ -131,7 +131,7 @@ impl Calendar {
         }
     }
 
-    fn dichotomy_idx(&self, period: Period) -> Option<(usize, usize)> {
+    fn dichotomy_idx(&self, period: Between<Date>) -> Option<(usize, usize)> {
         if self.items.len() == 0 {
             return None;
         }
@@ -147,12 +147,12 @@ impl Calendar {
         }
     }
 
-    fn dichotomy(&self, period: Period) -> Option<&[Summary]> {
+    fn dichotomy(&self, period: Between<Date>) -> Option<&[Summary]> {
         let (start, end) = self.dichotomy_idx(period)?;
         Some(&self.items[start..=end])
     }
 
-    fn dichotomy_mut(&mut self, period: Period) -> Option<&mut [Summary]> {
+    fn dichotomy_mut(&mut self, period: Between<Date>) -> Option<&mut [Summary]> {
         let (start, end) = self.dichotomy_idx(period)?;
         Some(&mut self.items[start..=end])
     }
@@ -203,7 +203,7 @@ mod test {
     #[test]
     fn dichotomies() {
         let cal = Calendar::from_spacing(
-            Period(dt!(2020-Jan-1), dt!(2020-Dec-31)),
+            Between(dt!(2020-Jan-1), dt!(2020-Dec-31)),
             Duration::Week,
             1
         );
@@ -229,13 +229,13 @@ mod test {
         let (_, idx, _) = query!(cal, dt!(2021-Jan-1));
         assert_eq!(idx, cal.items.len() - 1);
         // period
-        let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2019-Jun-15)));
+        let ans = cal.dichotomy(Between(dt!(2019-Jun-10), dt!(2019-Jun-15)));
         assert!(ans.is_none());
-        let ans = cal.dichotomy(Period(dt!(2021-Jun-10), dt!(2021-Jun-15)));
+        let ans = cal.dichotomy(Between(dt!(2021-Jun-10), dt!(2021-Jun-15)));
         assert!(ans.is_none());
-        let ans = cal.dichotomy(Period(dt!(2019-Jun-10), dt!(2021-Jun-15)));
+        let ans = cal.dichotomy(Between(dt!(2019-Jun-10), dt!(2021-Jun-15)));
         assert_eq!(ans.unwrap().len(), cal.items.len());
-        let ans = cal.dichotomy(Period(dt!(2020-Jan-20), dt!(2020-Mar-18))).unwrap();
+        let ans = cal.dichotomy(Between(dt!(2020-Jan-20), dt!(2020-Mar-18))).unwrap();
         assert!(ans[0].period.0 <= dt!(2020-Jan-20));
         assert!(ans[0].period.1 >= dt!(2020-Jan-20));
         assert!(ans[ans.len() - 1].period.0 <= dt!(2020-Mar-18));

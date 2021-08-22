@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use num_derive::FromPrimitive;
 
-use crate::lib::date::{Date, Period};
+use crate::lib::date::{Date, Between};
 
 /// Contents of entries
 pub mod fields {
@@ -42,7 +42,7 @@ impl fmt::Display for Tag {
 pub struct Entry {
     value: Amount,
     cat: Category,
-    period: Period,
+    period: Between<Date>,
     /// cached length of the period for performance
     length: usize,
     tag: Option<Tag>,
@@ -139,7 +139,7 @@ impl std::iter::Sum for Amount {
 
 impl Entry {
     /// Aggregate elements into a single entry
-    pub fn from(value: Amount, cat: Category, period: Period, tag: Tag) -> Self {
+    pub fn from(value: Amount, cat: Category, period: Between<Date>, tag: Tag) -> Self {
         let length = period.1.index() - period.0.index() + 1;
         Self {
             value,
@@ -151,7 +151,7 @@ impl Entry {
     }
 
     /// Calculate intersection with a period, discard the label
-    pub fn intersect_loss(&self, period: Period) -> Option<Self> {
+    pub fn intersect_loss(&self, period: Between<Date>) -> Option<Self> {
         let start = period.0.max(self.period.0);
         let end = period.1.min(self.period.1);
         if start > end {
@@ -174,7 +174,7 @@ impl Entry {
         }
         Some(Self {
             value: Amount(before_end - before_start),
-            period: Period(start, end),
+            period: Between(start, end),
             length: idx_new.1 - idx_new.0 + 1,
             tag: None,
             cat: self.cat,
@@ -182,7 +182,7 @@ impl Entry {
     }
 
     /// Calculate intersection with a period, keep the label
-    pub fn intersect(mut self, period: Period) -> Option<Self> {
+    pub fn intersect(mut self, period: Between<Date>) -> Option<Self> {
         let tag = self.tag.take();
         self.intersect_loss(period).map(|mut entry| {
             entry.tag = tag;
@@ -198,7 +198,7 @@ impl Entry {
         self.cat
     }
 
-    pub fn period(&self) -> Period {
+    pub fn period(&self) -> Between<Date> {
         self.period
     }
 }
@@ -229,7 +229,7 @@ impl Span {
     }
 
     /// Use reference date to create a range of dates
-    pub fn period(&self, dt: Date) -> Period {
+    pub fn period(&self, dt: Date) -> Between<Date> {
         use Duration::*;
         use Window::*;
         let nb = self.count as isize;
@@ -272,7 +272,7 @@ impl Span {
                 (d.jump_year(-nb), d.prev())
             }
         };
-        Period(start, end)
+        Between(start, end)
     }
 }
 
@@ -355,7 +355,7 @@ mod test {
 
     macro_rules! check {
         ( $date:expr, $span:expr, $start:expr, $end:expr ) => {
-            assert_eq!($span.period($date), Period($start, $end));
+            assert_eq!($span.period($date), Between($start, $end));
         };
     }
 
@@ -546,7 +546,7 @@ mod test {
                 value,
                 cat: Category::Food,
                 tag: None,
-                period: Period(start, end),
+                period: Between(start, end),
                 length: end.index() - start.index() + 1,
             }
         }};
@@ -556,14 +556,14 @@ mod test {
     fn intersections() {
         assert_eq!(
             bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31))
-                .intersect(Period(dt!(2021-Feb-1), dt!(2021-Feb-15)))
+                .intersect(Between(dt!(2021-Feb-1), dt!(2021-Feb-15)))
                 .unwrap()
                 .value,
             Amount(15)
         );
         assert_eq!(
             bogus!(365, dt!(2021-Jan-1), dt!(2021-Dec-31))
-                .intersect(Period(dt!(2020-Sep-15), dt!(2021-Jan-15)))
+                .intersect(Between(dt!(2020-Sep-15), dt!(2021-Jan-15)))
                 .unwrap()
                 .value,
             Amount(15)
@@ -578,7 +578,7 @@ mod test {
             ];
             let splits = sections
                 .windows(2)
-                .map(|w| entry.clone().intersect(Period(w[0], w[1].prev())).unwrap());
+                .map(|w| entry.clone().intersect(Between(w[0], w[1].prev())).unwrap());
             assert_eq!(entry.value, splits.map(|e| e.value).sum())
         }
     }

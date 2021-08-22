@@ -2,7 +2,7 @@ use num_traits::FromPrimitive;
 use std::fmt;
 
 use crate::lib::{
-    date::Period,
+    date::{Date, Between},
     entry::{Amount, Category},
     summary::Summary,
 };
@@ -117,7 +117,7 @@ impl BoxFmt {
         }
     }
 
-    fn period(p: Period) -> Self {
+    fn period(p: Between<Date>) -> Self {
         Self::from(format!("{}", p))
     }
 

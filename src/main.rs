@@ -4,7 +4,7 @@ mod load;
 
 use cli::{plot::Plotter, table::Table};
 use lib::{
-    date::{Date, Duration, Month, TimeFrame},
+    date::{Date, Duration, Month, Interval},
     summary::Calendar,
 };
 use std::collections::{BTreeSet, HashMap};
@@ -43,7 +43,7 @@ fn main() {
     let (entries, errs, mut timeframe) = load::read_entries(&filename);
     println!("{}", errs);
     if let Some(lst) = entries {
-        timeframe = timeframe.intersect(TimeFrame::Between(
+        timeframe = timeframe.intersect(Interval::Between(
             Date::from(2020, Month::Sep, 1).unwrap(),
             Date::from(2022, Month::Jan, 1).unwrap(),
         ));
@@ -52,7 +52,7 @@ fn main() {
         dbg!(&tables, &plots);
         let mut calendars: HashMap<Duration, Calendar> = tables
             .union(&plots)
-            .map(|&k| (k, Calendar::from_spacing(timeframe.as_period(), k, 1)))
+            .map(|&k| (k, Calendar::from_spacing(timeframe.as_between(), k, 1)))
             .collect();
         for (_, cal) in calendars.iter_mut() {
             cal.register(&lst);
