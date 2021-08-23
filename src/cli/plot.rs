@@ -74,7 +74,7 @@ where
     fn split(self) -> Vec<(i64, String)> {
         vec![
             (self.lower.to_scalar(), self.lower.to_string()),
-            (self.upper.to_scalar(), self.lower.to_string()),
+            (self.upper.to_scalar(), self.upper.to_string()),
         ]
     }
 }
@@ -318,7 +318,8 @@ struct RangeGroupDrawer {
 }
 
 use svg::{
-    node::element::{path::Data, Line, Path},
+    node::element::{path::Data, Line, Path, Text},
+    node,
     Document,
 };
 
@@ -394,13 +395,21 @@ impl RangeGroupDrawer {
             .set("stroke", "black")
             .set("stroke-width", dim.stroke_width);
         let ygrad = self.grad_y.iter().map(|(n, txt)| {
+            (
             Line::new()
                 .set("x1", dim.resize_x(dim.min_x))
                 .set("x2", dim.resize_x(dim.min_x) - dim.margin / 2.0)
                 .set("y1", dim.resize_y(*n))
                 .set("y2", dim.resize_y(*n))
                 .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width),
+            Text::new()
+                .set("x", dim.resize_x(dim.min_x) + dim.margin / 2.0)
+                .set("y", dim.resize_y(*n))
+                .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width)
+                .add(node::Text::new(txt))
+            )
         });
         let xaxis = Line::new()
             .set("x1", dim.resize_x(dim.min_x))
@@ -410,13 +419,20 @@ impl RangeGroupDrawer {
             .set("stroke", "black")
             .set("stroke-width", dim.stroke_width);
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
-            Line::new()
+            (Line::new()
                 .set("x1", dim.resize_x(*n))
                 .set("x2", dim.resize_x(*n))
                 .set("y1", dim.resize_y(0))
                 .set("y2", dim.resize_y(0) + dim.margin / 2.0)
                 .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width),
+            Text::new()
+                .set("x", dim.resize_x(*n) + dim.margin / 2.0)
+                .set("y", dim.resize_y(0) - dim.margin / 2.0)
+                .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width)
+                .add(node::Text::new(txt))
+            )
         });
         let document = paths
             .into_iter()
@@ -424,16 +440,16 @@ impl RangeGroupDrawer {
         let document = ygrad
             .into_iter()
             .chain(xgrad.into_iter())
-            .fold(document, |doc, path| doc.add(path))
+            .fold(document, |doc, (path, text)| doc.add(path).add(text))
             .add(yaxis)
             .add(xaxis)
             .set(
                 "viewBox",
                 (
-                    -dim.margin,
-                    -dim.margin,
+                    -2.0 * dim.margin,
+                    -2.0 * dim.margin,
                     dim.view_width + 2.0 * dim.margin,
-                    dim.view_height + 2.0 * dim.margin,
+                    dim.view_height + 4.0 * dim.margin,
                 ),
             );
         svg::save(file, &document).unwrap();
