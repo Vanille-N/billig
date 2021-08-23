@@ -404,9 +404,10 @@ impl RangeGroupDrawer {
                 .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width),
             Text::new()
-                .set("x", dim.resize_x(dim.min_x) + dim.margin / 2.0)
-                .set("y", dim.resize_y(*n))
+                .set("x", dim.resize_x(dim.min_x) - dim.margin)
+                .set("y", dim.resize_y(*n) + dim.margin / 4.0)
                 .set("stroke", "black")
+                .set("text-anchor", "end")
                 .set("stroke-width", dim.stroke_width)
                 .add(node::Text::new(txt))
             )
@@ -419,16 +420,17 @@ impl RangeGroupDrawer {
             .set("stroke", "black")
             .set("stroke-width", dim.stroke_width);
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
+            let x = dim.resize_x(*n);
+            let y = dim.resize_y(0);
             (Line::new()
-                .set("x1", dim.resize_x(*n))
-                .set("x2", dim.resize_x(*n))
-                .set("y1", dim.resize_y(0))
-                .set("y2", dim.resize_y(0) + dim.margin / 2.0)
+                .set("x1", x)
+                .set("x2", x)
+                .set("y1", y)
+                .set("y2", y + dim.margin / 2.0)
                 .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width),
             Text::new()
-                .set("x", dim.resize_x(*n) + dim.margin / 2.0)
-                .set("y", dim.resize_y(0) - dim.margin / 2.0)
+                .set("transform", format!("rotate(40, {x}, {y}) translate({x} {y}) translate(10 20)", x = x + dim.margin / 2.0, y = y - dim.margin / 2.0))
                 .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width)
                 .add(node::Text::new(txt))
