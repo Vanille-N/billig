@@ -71,11 +71,14 @@ impl<T> Grads<T>
 where
     T: ToString + Scalar,
 {
-    fn split(self) -> Vec<(i64, String)> {
-        vec![
-            (self.lower.to_scalar(), self.lower.to_string()),
-            (self.upper.to_scalar(), self.upper.to_string()),
-        ]
+    fn split(self) -> impl Iterator<Item = T> {
+        vec![self.lower, self.upper].into_iter()
+    }
+
+    fn into_grads(self) -> Vec<(i64, String)> {
+        self.split()
+            .map(|x| (x.to_scalar(), x.to_string()))
+            .collect::<Vec<_>>()
     }
 }
 
@@ -237,8 +240,8 @@ where
         }
         RangeGroupDrawer {
             points,
-            grad_x: grad_x.split(),
-            grad_y: grad_y.split(),
+            grad_x: grad_x.into_grads(),
+            grad_y: grad_y.into_grads(),
         }
     }
 }
