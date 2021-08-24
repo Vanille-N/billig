@@ -40,6 +40,7 @@ impl<'d> Plotter<'d> {
     }
 }
 
+/// Holds data for bounds of data to graduate
 pub struct Grads<T> {
     lower: T,
     upper: T,
@@ -49,6 +50,7 @@ impl<T> Grads<T>
 where
     T: Minimax,
 {
+    /// Default impl: empty interval
     fn new() -> Self {
         Self {
             lower: T::MAX,
@@ -61,6 +63,7 @@ impl<T> Grads<T>
 where
     T: Ord + Copy,
 {
+    /// Add `data` to the current interval
     fn extend(&mut self, data: T) {
         self.lower = self.lower.min(data);
         self.upper = self.upper.max(data);
@@ -69,14 +72,11 @@ where
 
 impl<T> Grads<T>
 where
-    T: ToString + Scalar,
+    T: ToString + Scalar + Hierarchical,
 {
-    fn split(self) -> impl Iterator<Item = T> {
-        vec![self.lower, self.upper].into_iter()
-    }
-
     fn into_grads(self) -> Vec<(i64, String)> {
-        self.split()
+        T::hierarchy(self.lower, self.upper)
+            .into_iter()
             .map(|x| (x.to_scalar(), x.to_string()))
             .collect::<Vec<_>>()
     }
@@ -85,6 +85,72 @@ where
 pub trait GradExtend {
     type Item;
     fn extend(&self, grads: &mut Grads<Self::Item>);
+}
+
+pub trait Hierarchical: Sized {
+    fn hierarchy(lo: Self, hi: Self) -> Vec<Self> {
+        vec![lo, hi]
+    }
+}
+
+impl Hierarchical for Amount {
+    fn hierarchy(lo: Self, hi: Self) -> Vec<Self> {
+        // calculate step for ~target graduations
+        let step = {
+            let mut step = 1;
+            let diff = (hi.0 - lo.0).abs();
+            let target = 7;
+            while diff / step > target {
+                if diff / step / 10 > target {
+                    step *= 10;
+                } else if diff / step / 5 > target {
+                    step *= 5;
+                } else if diff / step / 2 > target {
+                    step *= 2;
+                } else {
+                    break;
+                }
+            }
+            step
+        };
+        let mut v = Vec::new();
+        let mut curr = 0;
+        // find lower bound
+        while curr < lo.0 {
+            curr += step;
+        }
+        while curr >= lo.0 {
+            curr -= step;
+        }
+        curr += step;
+        // step to upper bound
+        while curr <= hi.0 {
+            v.push(Amount(curr));
+            curr += step;
+        }
+        v
+    }
+}
+
+impl Hierarchical for Date {
+    fn hierarchy(lo: Self, hi: Self) -> Vec<Self> {
+        let diff = hi.index() - lo.index();
+        let step = {
+            let mut step = 1;
+            let target = 10;
+            while diff / step > 10 {
+                step += 1;
+            }
+            step as isize
+        };
+        let mut curr = lo;
+        let mut v = Vec::new();
+        while curr < hi {
+            v.push(curr);
+            curr = curr.jump_day(step);
+        }
+        v
+    }
 }
 
 /// Generic plotter
@@ -224,8 +290,8 @@ impl<X, Y> Plot<X, Y>
 where
     X: ScalarRange + GradExtend,
     Y: ScalarGroup + GradExtend,
-    <X as GradExtend>::Item: ToString + Scalar + Minimax,
-    <Y as GradExtend>::Item: ToString + Scalar + Minimax,
+    <X as GradExtend>::Item: ToString + Scalar + Minimax + Hierarchical,
+    <Y as GradExtend>::Item: ToString + Scalar + Minimax + Hierarchical,
 {
     fn to_range_group_drawer(&self) -> RangeGroupDrawer {
         let mut points = Vec::new();
