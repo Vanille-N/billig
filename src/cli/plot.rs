@@ -377,6 +377,18 @@ impl Dimensions {
     fn resize_y(&self, y: i64) -> f64 {
         (self.max_y - y) as f64 / self.delta_y as f64 * self.view_height
     }
+
+    fn margin(&self) -> f64 {
+        self.margin
+    }
+
+    fn margin_big(&self) -> f64 {
+        self.margin * 2.0
+    }
+
+    fn margin_small(&self) -> f64 {
+        self.margin / 2.0
+    }
 }
 
 #[derive(Debug)]
@@ -400,6 +412,11 @@ impl RangeGroupDrawer {
                 .iter()
                 .map(|((start, end), points)| ([start, end], points)),
         );
+        let black_line = || {
+            Line::new()
+                .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width)
+        };
         // plot columns one by one
         if self.points.is_empty() {
             return;
@@ -456,50 +473,52 @@ impl RangeGroupDrawer {
             .into_iter()
             .enumerate()
             .map(|(i, gr)| Path::new().set("fill", COLORS[i]).set("d", gr.close()));
-        let yaxis = Line::new()
+        let yaxis = black_line()
             .set("x1", dim.resize_x(dim.min_x))
             .set("x2", dim.resize_x(dim.min_x))
-            .set("y1", dim.resize_y(dim.max_y) - dim.margin / 2.0)
-            .set("y2", dim.resize_y(dim.min_y) + dim.margin / 2.0)
-            .set("stroke", "black")
-            .set("stroke-width", dim.stroke_width);
+            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
+            .set("y2", dim.resize_y(dim.min_y) + dim.margin());
+        let ylarrow = black_line()
+            .set("x1", dim.resize_x(dim.min_x))
+            .set("x2", dim.resize_x(dim.min_x) + dim.margin_small())
+            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
+            .set("y2", dim.resize_y(dim.max_y));
+        let yrarrow = black_line()
+            .set("x1", dim.resize_x(dim.min_x))
+            .set("x2", dim.resize_x(dim.min_x) - dim.margin_small())
+            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
+            .set("y2", dim.resize_y(dim.max_y));
         let ygrad = self.grad_y.iter().map(|(n, txt)| {
             (
-            Line::new()
+            black_line()
                 .set("x1", dim.resize_x(dim.min_x))
-                .set("x2", dim.resize_x(dim.min_x) - dim.margin / 2.0)
+                .set("x2", dim.resize_x(dim.min_x) - dim.margin_small())
                 .set("y1", dim.resize_y(*n))
-                .set("y2", dim.resize_y(*n))
-                .set("stroke", "black")
-                .set("stroke-width", dim.stroke_width),
+                .set("y2", dim.resize_y(*n)),
             Text::new()
-                .set("x", dim.resize_x(dim.min_x) - dim.margin)
-                .set("y", dim.resize_y(*n) + dim.margin / 4.0)
+                .set("x", dim.resize_x(dim.min_x) - dim.margin())
+                .set("y", dim.resize_y(*n) + dim.margin_small())
                 .set("stroke", "black")
                 .set("text-anchor", "end")
                 .set("stroke-width", dim.stroke_width)
                 .add(node::Text::new(txt))
             )
         });
-        let xaxis = Line::new()
+        let xaxis = black_line()
             .set("x1", dim.resize_x(dim.min_x))
-            .set("x2", dim.resize_x(dim.max_x) + dim.margin / 2.0)
+            .set("x2", dim.resize_x(dim.max_x) + dim.margin())
             .set("y1", dim.resize_y(0))
-            .set("y2", dim.resize_y(0))
-            .set("stroke", "black")
-            .set("stroke-width", dim.stroke_width);
+            .set("y2", dim.resize_y(0));
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
             let x = dim.resize_x(*n);
             let y = dim.resize_y(0);
-            (Line::new()
+            (black_line()
                 .set("x1", x)
                 .set("x2", x)
                 .set("y1", y)
-                .set("y2", y + dim.margin / 2.0)
-                .set("stroke", "black")
-                .set("stroke-width", dim.stroke_width),
+                .set("y2", y + dim.margin()),
             Text::new()
-                .set("transform", format!("rotate(40, {x}, {y}) translate({x} {y}) translate(10 20)", x = x + dim.margin / 2.0, y = y - dim.margin / 2.0))
+                .set("transform", format!("rotate(40, {x}, {y}) translate({x} {y}) translate(10 20)", x = x + dim.margin_small(), y = y - dim.margin_small()))
                 .set("stroke", "black")
                 .set("stroke-width", dim.stroke_width)
                 .add(node::Text::new(txt))
@@ -513,14 +532,16 @@ impl RangeGroupDrawer {
             .chain(xgrad.into_iter())
             .fold(document, |doc, (path, text)| doc.add(path).add(text))
             .add(yaxis)
+            .add(ylarrow)
+            .add(yrarrow)
             .add(xaxis)
             .set(
                 "viewBox",
                 (
-                    -2.0 * dim.margin,
-                    -2.0 * dim.margin,
-                    dim.view_width + 2.0 * dim.margin,
-                    dim.view_height + 4.0 * dim.margin,
+                    -dim.margin_big(),
+                    -dim.margin_big(),
+                    dim.view_width + dim.margin_big(),
+                    dim.view_height + dim.margin_big(),
                 ),
             );
         svg::save(file, &document).unwrap();

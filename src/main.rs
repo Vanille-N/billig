@@ -49,7 +49,6 @@ fn main() {
         ));
         let tables = durations(&matches, "table");
         let plots = durations(&matches, "plot");
-        dbg!(&tables, &plots);
         let mut calendars: HashMap<Duration, Calendar> = tables
             .union(&plots)
             .map(|&k| (k, Calendar::from_spacing(timeframe.into_between(), k, 1)))
