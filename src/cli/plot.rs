@@ -400,9 +400,44 @@ struct RangeGroupDrawer {
 
 use svg::{
     node,
-    node::element::{path::Data, Line, Path, Text},
+    node::element::{path::Data, Line as SvgLine, Path, Text},
     Document,
 };
+
+struct Line<'dim> {
+    dim: &'dim Dimensions,
+    line: SvgLine,
+}
+
+impl<'dim> Line<'dim> {
+    fn black(dim: &'dim Dimensions) -> Self {
+        Self {
+            dim,
+            line: SvgLine::new()
+                .set("stroke", "black")
+                .set("stroke-width", dim.stroke_width),
+        }
+    }
+    fn set_x1(mut self, x: i64, post: f64) -> Self {
+        self.line = self.line.set("x1", self.dim.resize_x(x) + post);
+        self
+    }
+    fn set_x2(mut self, x: i64, post: f64) -> Self {
+        self.line = self.line.set("x2", self.dim.resize_x(x) + post);
+        self
+    }
+    fn set_y1(mut self, y: i64, post: f64) -> Self {
+        self.line = self.line.set("y1", self.dim.resize_y(y) + post);
+        self
+    }
+    fn set_y2(mut self, y: i64, post: f64) -> Self {
+        self.line = self.line.set("y2", self.dim.resize_y(y) + post);
+        self
+    }
+    fn into_svg_line(self) -> SvgLine {
+        self.line
+    }
+}
 
 impl RangeGroupDrawer {
     fn render(&self, file: &str) {
@@ -412,11 +447,6 @@ impl RangeGroupDrawer {
                 .iter()
                 .map(|((start, end), points)| ([start, end], points)),
         );
-        let black_line = || {
-            Line::new()
-                .set("stroke", "black")
-                .set("stroke-width", dim.stroke_width)
-        };
         // plot columns one by one
         if self.points.is_empty() {
             return;
@@ -426,28 +456,32 @@ impl RangeGroupDrawer {
             .into_iter()
             .enumerate()
             .map(|(i, gr)| Path::new().set("fill", COLORS[i]).set("d", gr.close()));
-        let yaxis = black_line()
-            .set("x1", dim.resize_x(dim.min_x))
-            .set("x2", dim.resize_x(dim.min_x))
-            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
-            .set("y2", dim.resize_y(dim.min_y) + dim.margin());
-        let ylarrow = black_line()
-            .set("x1", dim.resize_x(dim.min_x))
-            .set("x2", dim.resize_x(dim.min_x) + dim.margin_small())
-            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
-            .set("y2", dim.resize_y(dim.max_y));
-        let yrarrow = black_line()
-            .set("x1", dim.resize_x(dim.min_x))
-            .set("x2", dim.resize_x(dim.min_x) - dim.margin_small())
-            .set("y1", dim.resize_y(dim.max_y) - dim.margin())
-            .set("y2", dim.resize_y(dim.max_y));
+        let yaxis = Line::black(&dim)
+            .set_x1(dim.min_x, 0.0)
+            .set_x2(dim.min_x, 0.0)
+            .set_y1(dim.max_y, -dim.margin())
+            .set_y2(dim.min_y, dim.margin())
+            .into_svg_line();
+        let ylarrow = Line::black(&dim)
+            .set_x1(dim.min_x, 0.0)
+            .set_x2(dim.min_x, dim.margin_small())
+            .set_y1(dim.max_y, -dim.margin())
+            .set_y2(dim.max_y, 0.0)
+            .into_svg_line();
+        let yrarrow = Line::black(&dim)
+            .set_x1(dim.min_x, 0.0)
+            .set_x2(dim.min_x, -dim.margin_small())
+            .set_y1(dim.max_y, -dim.margin())
+            .set_y2(dim.max_y, 0.0)
+            .into_svg_line();
         let ygrad = self.grad_y.iter().map(|(n, txt)| {
             (
-                black_line()
-                    .set("x1", dim.resize_x(dim.min_x))
-                    .set("x2", dim.resize_x(dim.min_x) - dim.margin_small())
-                    .set("y1", dim.resize_y(*n))
-                    .set("y2", dim.resize_y(*n)),
+                Line::black(&dim)
+                    .set_x1(dim.min_x, 0.0)
+                    .set_x2(dim.min_x, -dim.margin_small())
+                    .set_y1(*n, 0.0)
+                    .set_y2(*n, 0.0)
+                    .into_svg_line(),
                 Text::new()
                     .set("x", dim.resize_x(dim.min_x) - dim.margin())
                     .set("y", dim.resize_y(*n) + dim.margin_small())
@@ -457,20 +491,22 @@ impl RangeGroupDrawer {
                     .add(node::Text::new(txt)),
             )
         });
-        let xaxis = black_line()
-            .set("x1", dim.resize_x(dim.min_x))
-            .set("x2", dim.resize_x(dim.max_x) + dim.margin())
-            .set("y1", dim.resize_y(0))
-            .set("y2", dim.resize_y(0));
+        let xaxis = Line::black(&dim)
+            .set_x1(dim.min_x, 0.0)
+            .set_x2(dim.max_x, dim.margin())
+            .set_y1(0, 0.0)
+            .set_y2(0, 0.0)
+            .into_svg_line();
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
             let x = dim.resize_x(*n);
             let y = dim.resize_y(0);
             (
-                black_line()
-                    .set("x1", x)
-                    .set("x2", x)
-                    .set("y1", y)
-                    .set("y2", y + dim.margin()),
+                Line::black(&dim)
+                    .set_x1(0, x)
+                    .set_x2(0, x)
+                    .set_y1(0, y)
+                    .set_y2(0, y + dim.margin())
+                    .into_svg_line(),
                 Text::new()
                     .set(
                         "transform",
