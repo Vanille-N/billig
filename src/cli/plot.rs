@@ -338,7 +338,7 @@ impl Dimensions {
             stroke_width: 2.0,
             margin: 20.0,
             view_height: 700.0,
-            view_width: 1000.0,
+            view_width: 900.0,
             atomic_width: 0.0,
         }
         .update()
@@ -383,7 +383,7 @@ impl Dimensions {
     }
 
     fn margin_big(&self) -> f64 {
-        self.margin * 2.0
+        self.margin * 4.0
     }
 
     fn margin_small(&self) -> f64 {
@@ -466,13 +466,13 @@ impl RangeGroupDrawer {
             .set_x1(dim.min_x, 0.0)
             .set_x2(dim.min_x, dim.margin_small())
             .set_y1(dim.max_y, -dim.margin())
-            .set_y2(dim.max_y, 0.0)
+            .set_y2(dim.max_y, -dim.margin_small())
             .into_svg_line();
         let yrarrow = Line::black(&dim)
             .set_x1(dim.min_x, 0.0)
             .set_x2(dim.min_x, -dim.margin_small())
             .set_y1(dim.max_y, -dim.margin())
-            .set_y2(dim.max_y, 0.0)
+            .set_y2(dim.max_y, -dim.margin_small())
             .into_svg_line();
         let ygrad = self.grad_y.iter().map(|(n, txt)| {
             (
@@ -497,23 +497,33 @@ impl RangeGroupDrawer {
             .set_y1(0, 0.0)
             .set_y2(0, 0.0)
             .into_svg_line();
+        let xlarrow = Line::black(&dim)
+            .set_x1(dim.max_x, dim.margin())
+            .set_x2(dim.max_x, dim.margin_small())
+            .set_y1(0, 0.0)
+            .set_y2(0, dim.margin_small())
+            .into_svg_line();
+        let xrarrow = Line::black(&dim)
+            .set_x1(dim.max_x, dim.margin())
+            .set_x2(dim.max_x, dim.margin_small())
+            .set_y1(0, 0.0)
+            .set_y2(0, -dim.margin_small())
+            .into_svg_line();
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
-            let x = dim.resize_x(*n);
-            let y = dim.resize_y(0);
             (
                 Line::black(&dim)
-                    .set_x1(0, x)
-                    .set_x2(0, x)
-                    .set_y1(0, y)
-                    .set_y2(0, y + dim.margin())
+                    .set_x1(*n, 0.0)
+                    .set_x2(*n, 0.0)
+                    .set_y1(0, 0.0)
+                    .set_y2(0, dim.margin_small())
                     .into_svg_line(),
                 Text::new()
                     .set(
                         "transform",
                         format!(
                             "rotate(40, {x}, {y}) translate({x} {y}) translate(10 20)",
-                            x = x + dim.margin_small(),
-                            y = y - dim.margin_small()
+                            x = dim.resize_x(*n) + dim.margin_small(),
+                            y = dim.resize_y(0) - dim.margin_small()
                         ),
                     )
                     .set("stroke", "black")
@@ -531,14 +541,16 @@ impl RangeGroupDrawer {
             .add(yaxis)
             .add(ylarrow)
             .add(yrarrow)
+            .add(xlarrow)
+            .add(xrarrow)
             .add(xaxis)
             .set(
                 "viewBox",
                 (
                     -dim.margin_big(),
                     -dim.margin_big(),
-                    dim.view_width + dim.margin_big(),
-                    dim.view_height + dim.margin_big(),
+                    dim.view_width + dim.margin_big() * 2.0,
+                    dim.view_height + dim.margin_big() * 2.0,
                 ),
             );
         svg::save(file, &document).unwrap();
