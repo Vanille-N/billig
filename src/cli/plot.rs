@@ -137,7 +137,6 @@ impl Hierarchical for Date {
         let diff = hi.index() - lo.index();
         let step = {
             let mut step = 1;
-            let target = 10;
             while diff / step > 10 {
                 step += 1;
             }
@@ -452,7 +451,7 @@ impl RangeGroupDrawer {
             return;
         }
         let paths = self
-            .into_groups(&dim)
+            .extract_groups(&dim)
             .into_iter()
             .enumerate()
             .map(|(i, gr)| Path::new().set("fill", COLORS[i]).set("d", gr.close()));
@@ -556,7 +555,7 @@ impl RangeGroupDrawer {
         svg::save(file, &document).unwrap();
     }
 
-    fn into_groups(&self, dim: &Dimensions) -> Vec<Data> {
+    fn extract_groups(&self, dim: &Dimensions) -> Vec<Data> {
         let mut groups = Vec::new();
         let group_size = self.points[0].1.len();
         for i in 0..group_size - 1 {
