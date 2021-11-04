@@ -2,7 +2,7 @@
 name = "billig"
 version = "0.1.0"
 authors = ["Vanille-N <neven.villani@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "A command-line DSL budget manager"
 repository = "https://github.com/Vanille-N/billig/"
 license = "MIT OR Apache-2.0"
