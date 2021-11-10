@@ -410,6 +410,9 @@ struct Line<'dim> {
 
 impl<'dim> Line<'dim> {
     fn black(dim: &'dim Dimensions) -> Self {
+        Self::with_color(dim, "black")
+    }
+    fn with_color(dim: &'dim Dimensions, color: &'dim str) -> Self {
         Self {
             dim,
             line: SvgLine::new()
@@ -508,6 +511,17 @@ impl RangeGroupDrawer {
             .set_y1(0, 0.0)
             .set_y2(0, -dim.margin_small())
             .into_svg_line();
+        let hlines = self.grad_y.iter().map(|(n, _)| {
+            Line::with_color(&dim, "grey")
+                .set_x1(dim.min_x, 0.0)
+                .set_x2(dim.max_x, 0.0)
+                .set_y1(*n, 0.0)
+                .set_y2(*n, 0.0)
+                .into_svg_line()
+                .set("stroke-dasharray", "15,20")
+                .set("stroke-dashoffset", "15")
+                .set("stroke-width", 1)
+        });
         let xgrad = self.grad_x.iter().map(|(n, txt)| {
             (
                 Line::black(&dim)
@@ -533,6 +547,9 @@ impl RangeGroupDrawer {
         let document = paths
             .into_iter()
             .fold(Document::new(), |doc, path| doc.add(path));
+        let document = hlines
+            .into_iter()
+            .fold(document, |doc, hline| doc.add(hline));
         let document = ygrad
             .into_iter()
             .chain(xgrad.into_iter())
