@@ -106,6 +106,14 @@ pub enum Window {
 
 impl Category {
     pub const COUNT: usize = 8;
+
+    pub fn sign(self) -> bool {
+        use Category::*;
+        match self {
+            Salary => true,
+            _ => false,
+        }
+    }
 }
 
 use std::ops;

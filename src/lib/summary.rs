@@ -53,7 +53,11 @@ impl ops::AddAssign<&Entry> for Summary {
     fn add_assign(&mut self, entry: &Entry) {
         if let Some(entry) = entry.intersect_loss(self.period) {
             let idx = entry.category() as usize;
-            let add = entry.value();
+            let add = if entry.category().sign() {
+                entry.value()
+            } else {
+                -entry.value()
+            };
             self.categories[idx] += add;
             self.total += add;
         }

@@ -45,7 +45,7 @@ fn main() {
     if let Some(lst) = entries {
         timeframe = timeframe.intersect(Interval::Between(
             Date::from(2020, Month::Sep, 1).unwrap(),
-            Date::from(2022, Month::Jan, 1).unwrap(),
+            Date::from(2023, Month::Jan, 1).unwrap(),
         ));
         let tables = durations(&matches, "table");
         let plots = durations(&matches, "plot");
