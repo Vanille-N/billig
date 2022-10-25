@@ -12,7 +12,7 @@ use num_traits::FromPrimitive;
 use std::fmt;
 use std::str::FromStr;
 
-pub use crate::lib::{
+pub use crate::util::{
     entry::Duration,
     period::{Between, Interval},
 };
@@ -152,7 +152,7 @@ pub enum DateError {
     InvalidDay(usize),
 }
 
-impl crate::lib::period::Minimax for Date {
+impl crate::util::period::Minimax for Date {
     const MAX: Self = Self {
         year: 9999,
         month: Month::Dec,
@@ -199,6 +199,17 @@ impl Date {
     /// `self.year` accessor
     pub fn year(&self) -> u16 {
         self.year
+    }
+
+    /// As the name suggests, this returns the date relative to today
+    pub fn today() -> Self {
+        let local = chrono::offset::Local::today().naive_local();
+        use chrono::Datelike;
+        Self {
+            year: local.year() as u16,
+            month: Month::from_u32(local.month()).unwrap(),
+            day: local.day() as u8,
+        }
     }
 
     /// Biject the dates with integers

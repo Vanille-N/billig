@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::lib::date::{Date, Month};
+use crate::util::date::{Date, Month};
 
 pub trait Minimax: Ord {
     const MIN: Self;

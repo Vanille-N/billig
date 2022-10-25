@@ -11,7 +11,7 @@ type Pair<'i> = pest::iterators::Pair<'i, Rule>;
 /// Wrapper around Pest's `Pairs`
 type Pairs<'i> = pest::iterators::Pairs<'i, Rule>;
 
-use crate::lib::{
+use crate::util::{
     date::{Date, Month},
     entry::{self, Amount, Category, Entry, Span, Tag},
 };
@@ -621,7 +621,7 @@ fn validate_plain_entry(
                 tag.try_set(Tag(item.as_str().to_string()), errs);
             }
             Rule::period => {
-                use crate::lib::period;
+                use crate::util::period;
                 let loc = (path, item.as_span().clone());
                 let partial_period =
                     period::validate_partial_period(path, errs, item.into_inner())?;

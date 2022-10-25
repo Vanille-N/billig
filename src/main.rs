@@ -1,9 +1,9 @@
 mod cli;
-mod lib;
+mod util;
 mod load;
 
 use cli::{plot::Plotter, table::Table};
-use lib::{
+use util::{
     date::{Date, Duration, Interval, Month},
     summary::Calendar,
 };
@@ -38,15 +38,29 @@ fn main() {
                 .help("Choose plots to print (day, week, month, year)")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("period")
+                .short("D")
+                .long("period")
+                .value_name("YY-MM-DD..YY-MM-DD")
+                .help("Choose range of dates to analyze")
+                .takes_value(true),
+        )
         .get_matches();
+    let mut errs = load::error::Record::new();
+    // Get the period right now: we want these errors before we start parsing the file
+    let arg_timeframe = match parse_arg_timeframe(&matches, &mut errs) {
+        Some(timeframe) => timeframe,
+        None => {
+            println!("{}", errs);
+            return
+        }
+    };
     let filename = matches.value_of("source").unwrap();
-    let (entries, errs, mut timeframe) = load::read_entries(filename);
+    let (entries, mut timeframe) = load::read_entries(filename, &mut errs);
     println!("{}", errs);
     if let Some(lst) = entries {
-        timeframe = timeframe.intersect(Interval::Between(
-            Date::from(2020, Month::Sep, 1).unwrap(),
-            Date::from(2023, Month::Jan, 1).unwrap(),
-        ));
+        timeframe = timeframe.intersect(arg_timeframe);
         let tables = durations(&matches, "table");
         let plots = durations(&matches, "plot");
         let mut calendars: HashMap<Duration, Calendar> = tables
@@ -86,4 +100,17 @@ fn durations(matches: &clap::ArgMatches, label: &str) -> BTreeSet<Duration> {
     } else {
         BTreeSet::new()
     }
+}
+
+fn parse_arg_timeframe(args: &clap::ArgMatches, errs: &mut load::error::Record) -> Option<Interval<Date>> {
+    let value = match args.value_of("period") {
+        Some(arg) => arg,
+        None => return Some(Interval::Unbounded),
+    };
+    let pseudo_span = pest::Span::new(value, 0, value.len()).unwrap();
+    let pseudo_path = "cmdline";
+    let pseudo_loc = &(pseudo_path, pseudo_span);
+    let partial_interval = Interval::parse(pseudo_path, errs, value)?;
+    let interval = partial_interval.make(errs, pseudo_loc, Date::today())?;
+    Some(interval)
 }

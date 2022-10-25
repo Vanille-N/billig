@@ -1,6 +1,6 @@
 use std::ops;
 
-use crate::lib::{
+use crate::util::{
     date::{Between, Date},
     entry::{Amount, Category, Duration, Entry},
 };
@@ -107,7 +107,7 @@ impl Calendar {
     /// Construct from a standardized span step generator
     pub fn from_spacing(period: Between<Date>, duration: Duration, count: usize) -> Self {
         Self::from_step(period.0, |date| {
-            if period.1 <= date {
+            if period.1 < date {
                 return None;
             }
             let next = match duration {
@@ -116,7 +116,7 @@ impl Calendar {
                 Duration::Month => date.jump_month(count as isize),
                 Duration::Year => date.jump_year(count as isize),
             };
-            Some(period.1.min(next))
+            Some(next)
         })
     }
 

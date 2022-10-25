@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use num_derive::FromPrimitive;
 
-use crate::lib::date::{Between, Date};
+use crate::util::date::{Between, Date};
 
 /// Contents of entries
 pub mod fields {
@@ -32,7 +32,7 @@ impl fmt::Display for Amount {
     }
 }
 
-impl crate::lib::period::Minimax for Amount {
+impl crate::util::period::Minimax for Amount {
     const MIN: Self = Self(isize::MIN);
     const MAX: Self = Self(isize::MAX);
 }
@@ -341,7 +341,7 @@ impl FromStr for Window {
 mod test {
     use num_traits::FromPrimitive;
     use super::{Duration::*, Window::*, *};
-    use crate::lib::date::{Date, Month::*};
+    use crate::util::date::{Date, Month::*};
 
     #[test]
     fn count_categories() {

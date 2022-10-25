@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::lib::{
+use crate::util::{
     date::{self, Date, Interval},
     entry::{
         fields::{self, Category, Span},
@@ -219,7 +219,7 @@ pub fn instanciate<'i>(
                 };
                 let data = crate::load::parse::extract(filename, errs, &contents);
                 if errs.is_fatal() {
-                    return (Vec::new(), crate::lib::date::Interval::Empty);
+                    return (Vec::new(), crate::util::date::Interval::Empty);
                 }
                 let (pairs, period) =
                     crate::load::template::instanciate(filename, errs, data, templates.clone());

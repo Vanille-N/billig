@@ -1,4 +1,4 @@
-use crate::lib::{
+use crate::util::{
     date::Date,
     entry::Amount,
     period::{Between, Minimax},
@@ -416,7 +416,7 @@ impl<'dim> Line<'dim> {
         Self {
             dim,
             line: SvgLine::new()
-                .set("stroke", "black")
+                .set("stroke", color)
                 .set("stroke-width", dim.stroke_width),
         }
     }
